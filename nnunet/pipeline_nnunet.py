@@ -24,6 +24,7 @@ from shutil import copy2, rmtree
 from pathlib import Path
 import string
 import random
+import torch
 
 def run_subprocess(cmd, verbose, label):
     if verbose: print(f"Calling {label} command with:")
@@ -54,7 +55,10 @@ def reorient_to_RAS(fname):
     nib.save(niiRAS, fname)
 
 def hdbet(head, brain, verbose=True):
-    cmd = f'hd-bet -i "{head}" -o "{brain}"'
+    if not torch.cuda.is_available():
+        cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast'
+    else:
+        cmd = f'hd-bet -i "{head}" -o "{brain}"'
     run_subprocess(cmd, verbose, label="HDBET")
     
 
@@ -302,6 +306,9 @@ if __name__ == "__main__":
         args.fnOut = re.sub('\.nii(\.gz)?$', '', args.fnFLAIR) + args.suffix + '.nii.gz'
     if args.dirOut:
         args.fnOut = join(args.dirOut, basename(args.fnOut))
+
+    if not torch.cuda.is_available():
+        if verbose: print('\nWarning: No GPU found! HD-BET and nnU-Net will run on CPU, which might produce slightly differnt results!\n')
 
     # check whether output exists already, and raise error, if overwrite is false
     if os.path.exists(args.fnOut):
