@@ -54,7 +54,7 @@ def reorient_to_RAS(fname):
     nib.save(niiRAS, fname)
 
 def hdbet(head, brain, verbose=True):
-    cmd = f"hd-bet -i {head} -o {brain}"
+    cmd = f'hd-bet -i "{head}" -o "{brain}"'
     run_subprocess(cmd, verbose, label="HDBET")
     
 
@@ -74,11 +74,11 @@ def dilate_brainmask(fn, fnNew=None):
     nib.save(nii, fnNew)
 
 def register_with_slicer(fixed, moving, fixedMask, movingMask, registered, verbose=True):
-    slicer = (f'/opt/BRAINSFit/BRAINSFit --fixedVolume {fixed} --movingVolume {moving} --initializeTransformMode useCenterOfROIAlign'
-    f' --outputTransform {registered}.h5 --outputVolume {registered}.nii.gz' +
+    slicer = (f'/opt/BRAINSFit/BRAINSFit --fixedVolume "{fixed}" --movingVolume "{moving}" --initializeTransformMode useCenterOfROIAlign'
+    f' --outputTransform "{registered}.h5" --outputVolume "{registered}.nii.gz"' +
     f' --outputVolumePixelType float --samplingPercentage 0.1' +
     f' --transformType Rigid,Affine --translationScale 700 --interpolationMode WindowedSinc' +
-    f' --maskProcessingMode ROI --fixedBinaryVolume {fixedMask} --movingBinaryVolume {movingMask}' +
+    f' --maskProcessingMode ROI --fixedBinaryVolume "{fixedMask}" --movingBinaryVolume "{movingMask}"' +
     f' --echo')
     run_subprocess(slicer, verbose, label="SLICER's BRAINSFit")
 
@@ -109,9 +109,9 @@ def resample(image, reference=None, resampled=None, interpolator=None, transform
 
 def nnunet_prediction(dirInput, verbose=True):
     cmd = (
-        "nnUNet_predict"
-        f" -i {dirInput} -o {dirInput}"
-        " -tr nnUNetTrainerV2 -m 3d_fullres -p nnUNetPlansv2.1_8GB_iso1mm -t Task700_WMH"
+        'nnUNet_predict'
+        f' -i "{dirInput}" -o "{dirInput}"'
+        ' -tr nnUNetTrainerV2 -m 3d_fullres -p nnUNetPlansv2.1_8GB_iso1mm -t Task700_WMH'
     )
     run_subprocess(cmd, verbose, label="nnU-Net")
 
@@ -122,11 +122,11 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
     if verbose: print(f"Segmenting WMH from:\n"
         f"  {flair}\n"
         f"  {t1}")
-    if verbose: print(f"Warning: output label map will be written to:\n"
+    if verbose: print(f"Output label map will be written to:\n"
         f"  {wmh_mask}\n")
     
     if os.path.exists(wmh_mask) and verbose:
-        print('Output label map exists already and will be overwritten\n')
+        print('Warning: output label map exists already and will be overwritten\n')
 
     strRand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
     dirTemp = re.sub('\.nii(\.gz)?$', '_temp-'+strRand, wmh_mask)
