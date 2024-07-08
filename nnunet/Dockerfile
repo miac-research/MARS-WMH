@@ -18,6 +18,7 @@ FROM nvcr.io/nvidia/cuda:12.1.1-base-ubuntu22.04 AS final
 
 LABEL org.opencontainers.image.source https://github.com/miac-research/dl-wmh
 LABEL version="1.0.0"
+LABEL maintainer="MIAC"
 
 # Create folder structure required by nnU-Net
 RUN mkdir -p /nnunet/raw \
