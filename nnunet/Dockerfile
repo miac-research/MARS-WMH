@@ -53,7 +53,7 @@ RUN pip install --no-cache-dir --upgrade pip==24.1.1 \
     
 # nnU-Net model
 WORKDIR /nnunet/results/nnUNet/3d_fullres/Task700_WMH/nnUNetTrainerV2__nnUNetPlansv2.1_8GB_iso1mm
-COPY files/nnUNet_wmh .
+COPY files/nnUNet_wmh/. .
 
 # HD-BET
 WORKDIR /opt
@@ -80,7 +80,7 @@ ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 
 # Download Python pipeline script
 WORKDIR /opt/scripts/
-COPY files/pipeline_nnunet.py .
+COPY files/pipeline_nnunet.py /opt/scripts/pipeline_nnunet.py
 
 # Entrypoint
 ENTRYPOINT [ "python", "/opt/scripts/pipeline_nnunet.py" ]
