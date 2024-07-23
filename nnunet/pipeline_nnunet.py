@@ -3,7 +3,7 @@
 '''
 Description:
 nnU-Net pipeline for WMH segmentation, taking additionally care of:
-    1. axes orientation - if not RAS+, image will be reoriented to RAS+
+    1. axes orientation - if not RAS+ or LAS+, image will be reoriented to RAS+
     2. image resolution - will be reported, but not adjusted, since nnU-Net is doing this
     3. image registration - optional; T1w will be registered to FLAIR using Slicer software; this step needs brain masks which will be created with HD-BET
 
@@ -85,6 +85,7 @@ def dilate_brainmask(fn, fnNew=None):
     nib.save(nii, fnNew)
 
 def register_with_slicer(fixed, moving, fixedMask, movingMask, registered, verbose=True):
+    registered = re.sub('\.nii(\.gz)?$', '', registered) #- remove extension, which will be added below
     slicer = (f'/opt/BRAINSFit/BRAINSFit --fixedVolume "{fixed}" --movingVolume "{moving}" --initializeTransformMode useCenterOfROIAlign'
     f' --outputTransform "{registered}.h5" --outputVolume "{registered}.nii.gz"' +
     f' --outputVolumePixelType float --samplingPercentage 0.1' +
@@ -166,7 +167,7 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration=False, saveStatistics=
     t1_in = t1
     t1 = join(dirTemp, basename(t1))
     copy2(src=t1_in, dst=t1)
-    
+   
     # Copy qform to sform, to ensure consistent header
     flair = qfrom_2_sform_and_compress(flair)
     t1 = qfrom_2_sform_and_compress(t1)
