@@ -10,13 +10,14 @@ WORKDIR /build
 RUN wget --progress=dot:giga --no-check-certificate -O Slicer-4.10.2-linux-amd64.tar.gz https://slicer-packages.kitware.com/api/v1/file/60add73aae4540bf6a89c03b/download \
  && tar -zxf Slicer-4.10.2-linux-amd64.tar.gz -C /build
 ENV LD_LIBRARY_PATH=/build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10:/build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p /libs \
  && ldd /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit | grep -o '/build[^ ]*' | xargs -I '{}' cp -v '{}' /libs/
  
 # Stage 2 
 FROM nvcr.io/nvidia/cuda:12.1.1-base-ubuntu22.04 AS final
 
-LABEL org.opencontainers.image.source https://github.com/miac-research/dl-wmh
+LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
 LABEL version="1.0.0"
 LABEL maintainer="MIAC"
 
@@ -57,7 +58,10 @@ COPY files/nnUNet_wmh/. .
 
 # HD-BET
 WORKDIR /opt
-RUN apt-get update -qq && apt-get install -y -q --no-install-recommends git \
+RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
+    git=1:2.34.1-1ubuntu1.11 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
  && git clone https://github.com/MIC-DKFZ/HD-BET \
  && cd HD-BET \
  && git reset --hard d517276 \
