@@ -7,11 +7,6 @@ nnU-Net pipeline for WMH segmentation, taking additionally care of:
     2. image resolution - will be reported, but not adjusted, since nnU-Net is doing this
     3. image registration - optional; T1w will be registered to FLAIR using Slicer software; this step needs brain masks which will be created with HD-BET
 
-Example call on MCC:
-srun --cpus-per-task=10 --gres=gpu:1 --pty bash
-source /share/research/test/benno/python/env39/bin/activate
-python /share/research/userData/benno/Repos/re-025_brainstem/container/nnunet/pipeline_nnunet_calling_apptainer.py /path/to/t1.nii.gz
-
 '''
 
 import sys, os, time, subprocess, argparse, re
@@ -24,6 +19,7 @@ from shutil import copy2, rmtree
 from pathlib import Path
 import string
 import random
+import pandas as pd
 import torch
 
 def run_subprocess(cmd, verbose, label):
@@ -38,13 +34,24 @@ def run_subprocess(cmd, verbose, label):
     else:
         if verbose: print(output.stdout.decode("utf-8"))
 
-def qfrom_2_sform(fname_image):
-    nii = nib.load(fname_image)
+def qfrom_2_sform_and_compress(fname_in, fname_out=None):
+    
+    nii = nib.load(fname_in)
     nii.set_sform(nii.get_qform(), code="scanner")
     nii.set_qform(None, code="scanner")
     if nii.dataobj.slope==1 and nii.dataobj.inter==0:
         nii.header.set_slope_inter(1, 0)
-    nib.save(nii, fname_image)
+    if fname_out is None:
+        fname_out = fname_in
+    if fname_out.endswith('.nii'):
+        fname_remove = fname_out
+        fname_out = re.sub('\.nii$', '.nii.gz', fname_out)
+    nib.save(nii, fname_out)
+    if 'fname_remove' in locals() and os.path.exists(fname_remove):
+        Path(fname_remove).unlink()
+    
+    return  fname_out
+
 
 def reorient_to_RAS(fname):
     nii = nib.load(fname)
@@ -57,6 +64,7 @@ def reorient_to_RAS(fname):
 def hdbet(head, brain, verbose=True):
     if not torch.cuda.is_available():
         cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast'
+        # cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu'
     else:
         cmd = f'hd-bet -i "{head}" -o "{brain}"'
     run_subprocess(cmd, verbose, label="HDBET")
@@ -72,7 +80,7 @@ def dilate_brainmask(fn, fnNew=None):
     # Copy qform to sform, to ensure consistent headers in all input images
     nii.set_sform(nii.get_qform(),code='scanner')
     nii.set_qform(None,code='scanner')
-    nii.set_data_dtype('mask')
+    nii.set_data_dtype('uint8')
     if fnNew is None:
         fnNew = fn
     nib.save(nii, fnNew)
@@ -84,6 +92,7 @@ def register_with_slicer(fixed, moving, fixedMask, movingMask, registered, verbo
     f' --transformType Rigid,Affine --translationScale 700 --interpolationMode WindowedSinc' +
     f' --maskProcessingMode ROI --fixedBinaryVolume "{fixedMask}" --movingBinaryVolume "{movingMask}"' +
     f' --echo')
+    
     run_subprocess(slicer, verbose, label="SLICER's BRAINSFit")
 
 
@@ -111,6 +120,16 @@ def resample(image, reference=None, resampled=None, interpolator=None, transform
     sitk.WriteImage(res, resampled)
     
 
+def extract_statistics(fn):
+    nii = nib.load(fn)
+    arr = nii.get_fdata()
+    voxels = np.count_nonzero(arr)
+    volume = voxels * np.prod(nii.header.get_zooms()[0:3])
+    struct = ndimage.generate_binary_structure(arr.ndim, connectivity=1)
+    _, clusters = ndimage.label(arr, struct)
+    df = pd.DataFrame({'Name': ['volume','voxels','clusters'], 'Value': [round(volume,1), voxels, clusters], 'Unit': ['mm^3','count','count']}, dtype='object')
+    return df
+
 def nnunet_prediction(dirInput, verbose=True):
     cmd = (
         'nnUNet_predict'
@@ -120,7 +139,7 @@ def nnunet_prediction(dirInput, verbose=True):
     run_subprocess(cmd, verbose, label="nnU-Net")
 
 
-def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=False):
+def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration=False, saveStatistics=False, verbose=True, debug=False):
     
     start_script = time.time()
     if verbose: print(f"Segmenting WMH from:\n"
@@ -150,36 +169,40 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
     copy2(src=t1_in, dst=t1)
     
     # Copy qform to sform, to ensure consistent header
-    qfrom_2_sform(flair)
-    qfrom_2_sform(t1)
+    flair = qfrom_2_sform_and_compress(flair)
+    t1 = qfrom_2_sform_and_compress(t1)
 
     # Check and fix input images if necessary    
     if verbose: print('\nChecking input images:')
     niiFL = nib.load(flair)
     niiT1 = nib.load(t1)
     
-    # Check resolution (no action required, since resolution is handled by nnU-Net)
-    if verbose: 
-        zooms = np.array(niiFL.header.get_zooms()[0:3])
-        print(f'FLAIR resolution is {zooms}')
-        zooms = np.array(niiT1.header.get_zooms()[0:3])
-        print(f'T1w   resolution is {zooms}')
-
     # Check and correct orientation
     axcodesFL = nib.aff2axcodes(niiFL.affine)
     axcodesT1 = nib.aff2axcodes(niiT1.affine)
     if verbose: print(f'FLAIR axes orientation is {"".join(axcodesFL)}+')
     if verbose: print(f'T1w   axes orientation is {"".join(axcodesT1)}+')
+    if skipRegistration and axcodesT1 != axcodesFL:
+            raise ValueError('When providing registered FLAIR and T1w as input, the axes orientation must match! Please check registration of input images or let the pipeline do the registration!')
     reorient_flag = False
-    if axcodesFL != ('R','A','S'):
+    if axcodesFL != ('R','A','S') and axcodesFL != ('L','A','S'):
         if verbose: print('Reorienting FLAIR to RAS+')
         reorient_to_RAS(flair)
         reorient_flag = True
-    if axcodesT1 != ('R','A','S') and skipRegistration:
+    if reorient_flag and skipRegistration:
         if verbose: print('Reorienting T1w to RAS+')
         reorient_to_RAS(t1)
     if verbose: print('')
-        
+
+    # Check resolution (no action required, since resolution is handled by nnU-Net)
+    zoomsFL = np.array(niiFL.header.get_zooms()[0:3])
+    if verbose: print(f'FLAIR resolution is {zoomsFL}')
+    zoomsT1 = np.array(niiT1.header.get_zooms()[0:3])
+    if verbose: print(f'T1w   resolution is {zoomsT1}')
+    if skipRegistration and (zoomsT1 != zoomsFL).any():
+            raise ValueError('When providing registered FLAIR and T1w as input, the resolution must match! Please check registration of input images or let the pipeline do the registration!')
+    if verbose: print('')
+
 
     if skipRegistration:
 
@@ -188,29 +211,29 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
     else:
 
         # Create brain mask for FLAIR
-        flair_brain = re.sub('\.nii\.gz', '_brain.nii.gz', flair)
-        flair_bmask = re.sub('\.nii\.gz', '_brain_mask.nii.gz', flair)
+        flair_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', flair)
+        flair_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', flair)
         start = time.time()
         hdbet(flair, flair_brain, verbose)
         end = time.time()
         if verbose: print(f"Duration HDBET: {end - start}\n")
         # Create brain mask for T1w
-        t1_brain = re.sub('\.nii\.gz', '_brain.nii.gz', t1)
-        t1_bmask = re.sub('\.nii\.gz', '_brain_mask.nii.gz', t1)
+        t1_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', t1)
+        t1_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', t1)
         start = time.time()
         hdbet(t1, t1_brain, verbose)
         end = time.time()
         if verbose: print(f"Duration HDBET: {end - start}\n")
         
         # Dilate brain masks
-        flair_bmask_dil = re.sub('\.nii\.gz', '_dilated-c3-i2.nii.gz', flair_bmask)
+        flair_bmask_dil = re.sub('\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', flair_bmask)
         dilate_brainmask(flair_bmask, flair_bmask_dil)
-        t1_bmask_dil = re.sub('\.nii\.gz', '_dilated-c3-i2.nii.gz', t1_bmask)
+        t1_bmask_dil = re.sub('\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', t1_bmask)
         dilate_brainmask(t1_bmask, t1_bmask_dil)
 
         # Run registration
         start = time.time()
-        t1_rFlair = re.sub('\.nii\.gz', '_rFLAIR.nii.gz', t1)
+        t1_rFlair = re.sub('\.nii(\.gz)?$', '_rFLAIR.nii.gz', t1)
         register_with_slicer(flair, t1, flair_bmask_dil, t1_bmask_dil, t1_rFlair, verbose)
         end = time.time()
         if verbose: print(f"Duration registration: {end - start}\n")
@@ -231,9 +254,9 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
     end = time.time()
     if verbose: print(f"Duration nnU-Net: {end - start}\n")
     
-    # Expected output filenames is constructed by removing modality index
+    # Expected output filename is constructed by removing modality index
     labelmap = join(dirNnunet, 'wmh.nii.gz')
-    qfrom_2_sform(labelmap)
+    qfrom_2_sform_and_compress(labelmap)
 
     if reorient_flag:
         if verbose: print('\nReorienting label map according to original axes orientation')    
@@ -244,6 +267,15 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
         if verbose: print('\nNo postprocessing needed')
         copy2(labelmap, wmh_mask)
         if verbose: print(f'Label map was saved to: {wmh_mask}')
+    
+    # Extract statistics
+    if verbose or saveStatistics:
+        df = extract_statistics(wmh_mask)
+        if verbose: print(f'\nStatistics for WMH lesions in output mask:\n ', df)
+        if saveStatistics:
+            wmh_stats = re.sub('\.nii(\.gz)?$', '.csv', wmh_mask)
+            df.to_csv(wmh_stats, index=False)
+
 
 
     # Clean up
@@ -256,48 +288,67 @@ def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration, verbose=True, debug=F
     if verbose: print(f"\nTotal duration: {end - start_script}\n")
 
 
+
 def isNIfTI(s):
-    if os.path.isfile(s) and s.endswith('.nii.gz'):
+    if os.path.isfile(s) and (s.endswith('.nii.gz') or s.endswith('.nii')):
         return s
     elif os.path.isfile(s+'.nii.gz'):
         return s+'.nii.gz'
+    elif os.path.isfile(s+'.nii'):
+        return s+'.nii'
     else:
-        raise argparse.ArgumentTypeError("File path does not exist or is not compressed NIfTI. Please check: %s"%(s))
+        raise argparse.ArgumentTypeError("File path does not exist or is not NIfTI. Please check: %s"%(s))
     
 def isSuffix(s):
     if len(re.sub('\.nii(\.gz)?$', '', s)) > 0:
         return re.sub('\.nii(\.gz)?$', '', s)
     else:
         raise argparse.ArgumentTypeError("String is not suited as suffix. Please check: %s"%(s))
+
+class CustomArgumentParser(argparse.ArgumentParser):
+    # This subclass ensures that single dash options have to be one character long (after the dash) and separated from their arguments by a space
+    def parse_args(self, args=None, namespace=None):
+        for arg_string in args:
+            if arg_string.startswith('-') and not arg_string.startswith('--'):
+                if len(arg_string) > 2 and not arg_string[2].isspace():
+                    raise ValueError(f'Single dash options have to be one character long (after the dash) and separated from their arguments by a space. Argument "{arg_string}" violates this requirement.')
+        args = super().parse_args(args, namespace)
+        return args
     
 def iniParser():
-    parser = argparse.ArgumentParser(description="Predict WMH from FLAIR and T1w image. Resulting WMH mask will be in FLAIR space.")
-    group0 = parser.add_argument_group()
-    group0.add_argument("-flair", dest="fnFLAIR", type=isNIfTI, help="path to input FLAIR image NIfTI file (required)")
-    group0.add_argument("-t1", dest="fnT1", type=isNIfTI, help="path to input T1w image NIfTI file (required)")
-    group0.add_argument("-s", dest="suffix", type=isSuffix, default='_wmh', help="suffix appended to FLAIR file path (before extension), in order to create path to which to write WMH mask (defaults to '_wmh')")
-    group0.add_argument("-o", dest="fnOut", type=str, help="path to which to write the WMH mask as NIfTI file (optional, overrides option '-s')")
-    group0.add_argument("-d", dest="dirOut", type=str, help="path to output folder, to which to write the WMH mask (optional, if missing the parent folder of the path provided either with option '-o' or the input T1w is used)")
-    group0.add_argument("-x", dest="overwrite", action='store_true', help="allow overwriting output file if existing. By default, already existing output will raise an error.")
-    group0.add_argument("--skipRegistration", action='store_true', help="skip affine registration of T1 to FLAIR, assuming that these images are already in register.")
-    group0.add_argument("--debug", action='store_true', help="Don't delete temporary processing folder to allow debugging.")
-    group0.add_argument("-q", dest="quiet", action='store_true', help="suppress standard output to command line. Errors will still be displayed.")
+    parser = CustomArgumentParser(description="Predict WMH from FLAIR and T1w image. Resulting WMH mask will be in FLAIR space.")
+    group0 = parser.add_argument_group('required arguments')
+    group0.add_argument("--flair", dest="fnFLAIR", type=isNIfTI, help="path to input FLAIR image in NIfTI format")
+    group0.add_argument("--t1", dest="fnT1", type=isNIfTI, help="path to input T1w image in NIfTI format")
+    group1 = parser.add_argument_group('optional arguments')
+    group1.add_argument("-s", "--suffix", type=isSuffix, default='_wmh', help="suffix appended to FLAIR file path (before extension), in order to create path to which to write WMH mask (defaults to '_wmh')")
+    group1.add_argument("-o", "--fnOut", type=str, help="path to which to write the WMH mask as NIfTI file (overrides option '-s')")
+    group1.add_argument("-d", "--dirOut", type=str, help="path to output folder, to which to write the WMH mask (if missing the parent folder of the path provided either with option '-o' or with option '--flair' will be used)")
+    group1.add_argument("-x", "--overwrite", action='store_true', help="allow overwriting output file if existing. By default, already existing output will raise an error.")
+    group1.add_argument("--saveStatistics", action='store_true', help="save WMH lesion statistics (i.e. volume, voxels, clusters) to CSV file. Filename will be the same as for the output WMH mask, but with extension '.csv'")
+    group1.add_argument("--skipRegistration", action='store_true', help="skip affine registration of T1 to FLAIR, assuming that these images are already in register.")
+    group1.add_argument("--debug", action='store_true', help="don't delete temporary processing folder to allow debugging.")
+    group1.add_argument("--quiet", dest="quiet", action='store_true', help="suppress standard output to command line. Errors will still be displayed.")
     return parser
 
 if __name__ == "__main__":
 
     parser = iniParser()
-    args = parser.parse_args()
-
+    if len(sys.argv)<2:
+        parser.print_help()
+        sys.exit(0)
+    else:
+        args = parser.parse_args(sys.argv[1::])
+    
     verbose = not(args.quiet)
     if verbose:
         print("Running: " + " ".join([basename(sys.argv[0])]+sys.argv[1::]))
 
     # check essential input
     if not args.fnFLAIR:
-        raise ValueError('Please provide FLAIR image as input, using option "-flair"')
+        raise ValueError('Please provide FLAIR image as input, using option "--flair"')
     if not args.fnT1:
-        raise ValueError('Please provide T1w image as input, using option "-t1"')
+        raise ValueError('Please provide T1w image as input, using option "--t1"')
     
     # build output filename
     if args.fnOut:
@@ -307,13 +358,14 @@ if __name__ == "__main__":
     if args.dirOut:
         args.fnOut = join(args.dirOut, basename(args.fnOut))
 
+    # check availability GPU
     if not torch.cuda.is_available():
-        if verbose: print('\nWarning: No GPU found! HD-BET and nnU-Net will run on CPU, which might produce slightly differnt results!\n')
+        if verbose: print('\nWarning: No GPU found! HD-BET and nnU-Net will run on CPU, which could lead to slightly differnt results!\n')
 
     # check whether output exists already, and raise error, if overwrite is false
     if os.path.exists(args.fnOut):
         if not args.overwrite:
             raise ValueError(f'Output label map "{args.fnOut}" exists already. If you want to overwrite, use option "-x".')
 
-    pipeline_nnunet(args.fnFLAIR, args.fnT1, args.fnOut, args.skipRegistration, verbose, args.debug)
+    pipeline_nnunet(args.fnFLAIR, args.fnT1, args.fnOut, args.skipRegistration, args.saveStatistics, verbose, args.debug)
     
