@@ -1,4 +1,25 @@
-FROM nvcr.io/nvidia/tensorflow:23.03-tf1-py3
+# Stage 1: Slicer BRAINSFit with dependencies
+FROM ubuntu:jammy-20240627.1 AS builder
+
+RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
+    wget=1.21.2-2ubuntu1.1 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+ 
+WORKDIR /build 
+RUN wget --progress=dot:giga --no-check-certificate -O Slicer-4.10.2-linux-amd64.tar.gz https://slicer-packages.kitware.com/api/v1/file/60add73aae4540bf6a89c03b/download \
+ && tar -zxf Slicer-4.10.2-linux-amd64.tar.gz -C /build
+ENV LD_LIBRARY_PATH=/build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10:/build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN mkdir -p /libs \
+ && ldd /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit | grep -o '/build[^ ]*' | xargs -I '{}' cp -v '{}' /libs/
+ 
+# Stage 2 
+FROM nvcr.io/nvidia/tensorflow:23.03-tf1-py3 AS final
+
+LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
+LABEL version="1.0.0"
+LABEL maintainer="MIAC"
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
@@ -28,30 +49,12 @@ COPY model/WMH_170000.data-00000-of-00001 .
 COPY model/WMH_170000.index .
 COPY model/WMH_170000.meta .
 
-# Slicer BRAINSfit Registration Module    
-WORKDIR /opt
-RUN wget -nv -O Slicer-4.10.2-linux-amd64.tar.gz https://slicer-packages.kitware.com/api/v1/file/60add73aae4540bf6a89c03b/download
-RUN tar -zxf Slicer-4.10.2-linux-amd64.tar.gz -C /opt \
- && rm Slicer-4.10.2-linux-amd64.tar.gz \
- && rm    /opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/libPythonQt.so \
- && rm    /opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/libQt5WebEngineCore.so.5.11.2 \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/python2.7 \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/lib/Python \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/lib/cmake \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/lib/Teem-1.12.0 \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/lib/QtPlugins \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/Slicer \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/bin \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/include \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/libexec \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/resources \
- && rm -r /opt/Slicer-4.10.2-linux-amd64/share 
-ENV LD_LIBRARY_PATH=/opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10:/opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules
-
 # HD-BET
-RUN apt-get update -qq && apt-get install -y -q --no-install-recommends git
-WORKDIR /opt
-RUN git clone https://github.com/MIC-DKFZ/HD-BET \
+RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
+    git=1:2.25.1-1ubuntu3.10 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
+ && git clone https://github.com/MIC-DKFZ/HD-BET \
  && cd HD-BET \
  && git reset --hard d517276 \
  && rm HD_BET/paths.py \
@@ -64,7 +67,13 @@ RUN wget -nv -O 0.model https://zenodo.org/record/2540695/files/0.model?download
  && wget -nv -O 2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
  && wget -nv -O 3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
  && wget -nv -O 4.model https://zenodo.org/record/2540695/files/4.model?download=1
- 
+
+# Slicer BRAINSfit from Stage 1
+WORKDIR /opt/BRAINSFit
+COPY --from=builder /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit .
+COPY --from=builder /libs .
+ENV LD_LIBRARY_PATH=/opt/BRAINSFit
+
 # Download Python pipeline script
 WORKDIR /opt/scripts/
 # RUN wget -nv -O pipeline_mdgru.py https://raw.githubusercontent.com/miac-research/dl-brainstem/main/mdgru/pipeline_mdgru.py
