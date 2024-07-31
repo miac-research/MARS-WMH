@@ -16,12 +16,16 @@ RUN mkdir -p /libs \
  
 # Stage 2 
 FROM nvcr.io/nvidia/tensorflow:23.03-tf1-py3 AS final
+RUN adduser --system --no-create-home nonroot
 
 LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
 LABEL version="1.0.0"
 LABEL maintainer="MIAC"
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8"
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
@@ -50,6 +54,7 @@ COPY model/WMH_170000.index .
 COPY model/WMH_170000.meta .
 
 # HD-BET
+WORKDIR /opt
 RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
     git=1:2.25.1-1ubuntu3.10 \
  && apt-get clean \
@@ -59,25 +64,24 @@ RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
  && git reset --hard d517276 \
  && rm HD_BET/paths.py \
  && echo "folder_with_parameter_files = '/opt/HD-BET_models'" > HD_BET/paths.py \
- && python -m pip install --no-cache-dir -e .
-
-WORKDIR /opt/HD-BET_models
-RUN wget -nv -O 0.model https://zenodo.org/record/2540695/files/0.model?download=1 \
- && wget -nv -O 1.model https://zenodo.org/record/2540695/files/1.model?download=1 \
- && wget -nv -O 2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
- && wget -nv -O 3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
- && wget -nv -O 4.model https://zenodo.org/record/2540695/files/4.model?download=1
+ && python -m pip install --no-cache-dir -e . \
+ && mkdir /opt/HD-BET_models \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/0.model https://zenodo.org/record/2540695/files/0.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/1.model https://zenodo.org/record/2540695/files/1.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/4.model https://zenodo.org/record/2540695/files/4.model?download=1
 
 # Slicer BRAINSfit from Stage 1
 WORKDIR /opt/BRAINSFit
-COPY --from=builder /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit .
-COPY --from=builder /libs .
+COPY --from=builder /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit \
+                    /libs ./
 ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 
 # Download Python pipeline script
 WORKDIR /opt/scripts/
-# RUN wget -nv -O pipeline_mdgru.py https://raw.githubusercontent.com/miac-research/dl-brainstem/main/mdgru/pipeline_mdgru.py
 COPY files/pipeline_mdgru.py /opt/scripts/pipeline_mdgru.py
 
 # Entrypoint
+USER nonroot
 ENTRYPOINT [ "python", "/opt/scripts/pipeline_mdgru.py" ]

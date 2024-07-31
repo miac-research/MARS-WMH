@@ -16,6 +16,7 @@ RUN mkdir -p /libs \
  
 # Stage 2 
 FROM nvcr.io/nvidia/cuda:12.1.1-base-ubuntu22.04 AS final
+RUN adduser --system --no-create-home nonroot
 
 LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
 LABEL version="1.0.0"
@@ -31,16 +32,23 @@ RUN mkdir -p /nnunet/raw \
 ENV nnUNet_raw_data_base=/nnunet/raw \
     nnUNet_preprocessed=/nnunet/preprocessed \
     RESULTS_FOLDER=/nnunet/results \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8"
 
-# Install OS dependencies
+# Install OS dependencies and fix Locale error in Apptainer
 RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
-	python3=3.10.6-1~22.04 \
+    locales=2.35-0ubuntu3.8 \
+    python3=3.10.6-1~22.04 \
 	python3-pip=22.0.2+dfsg-1ubuntu0.4 \
 	python-is-python3=3.9.2-2 \
     wget=1.21.2-2ubuntu1.1 \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+ && dpkg-reconfigure --frontend=noninteractive locales \
+ && update-locale LANG="en_US.UTF-8"
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip==24.1.1 \
@@ -67,19 +75,18 @@ RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
  && git reset --hard d517276 \
  && rm HD_BET/paths.py \
  && echo "folder_with_parameter_files = '/opt/HD-BET_models'" > HD_BET/paths.py \
- && python -m pip install --no-cache-dir -e .
-
-WORKDIR /opt/HD-BET_models
-RUN wget -nv -O 0.model https://zenodo.org/record/2540695/files/0.model?download=1 \
- && wget -nv -O 1.model https://zenodo.org/record/2540695/files/1.model?download=1 \
- && wget -nv -O 2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
- && wget -nv -O 3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
- && wget -nv -O 4.model https://zenodo.org/record/2540695/files/4.model?download=1
+ && python -m pip install --no-cache-dir -e . \
+ && mkdir /opt/HD-BET_models \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/0.model https://zenodo.org/record/2540695/files/0.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/1.model https://zenodo.org/record/2540695/files/1.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/4.model https://zenodo.org/record/2540695/files/4.model?download=1
 
 # Slicer BRAINSfit from Stage 1
 WORKDIR /opt/BRAINSFit
-COPY --from=builder /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit .
-COPY --from=builder /libs .
+COPY --from=builder /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit \
+                    /libs ./
 ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 
 # Download Python pipeline script
@@ -87,4 +94,5 @@ WORKDIR /opt/scripts/
 COPY files/pipeline_nnunet.py /opt/scripts/pipeline_nnunet.py
 
 # Entrypoint
+USER nonroot
 ENTRYPOINT [ "python", "/opt/scripts/pipeline_nnunet.py" ]
