@@ -318,8 +318,8 @@ class CustomArgumentParser(argparse.ArgumentParser):
 def iniParser():
     parser = CustomArgumentParser(description="Predict WMH from FLAIR and T1w image. Resulting WMH mask will be in FLAIR space.")
     group0 = parser.add_argument_group('required arguments')
-    group0.add_argument("--flair", dest="fnFLAIR", type=isNIfTI, help="path to input FLAIR image in NIfTI format")
-    group0.add_argument("--t1", dest="fnT1", type=isNIfTI, help="path to input T1w image in NIfTI format")
+    group0.add_argument("--flair", required=True, metavar='NIfTI', dest="fnFLAIR", type=isNIfTI, help="path to input FLAIR image in NIfTI format")
+    group0.add_argument("--t1", required=True, metavar='NIfTI', dest="fnT1", type=isNIfTI, help="path to input T1w image in NIfTI format")
     group1 = parser.add_argument_group('optional arguments')
     group1.add_argument("-s", "--suffix", type=isSuffix, default='_wmh', help="suffix appended to FLAIR file path (before extension), in order to create path to which to write WMH mask (defaults to '_wmh')")
     group1.add_argument("-o", "--fnOut", type=str, help="path to which to write the WMH mask as NIfTI file (overrides option '-s')")
