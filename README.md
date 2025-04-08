@@ -1,26 +1,29 @@
-# Container images for deep learning-based WMH segmentation
+# MARS-brainstem: Deep learning-based WMH segmentation
 
-This repository contains the code required to build the container images of two **deep learning-based brain white matter hyperintensity (WMH) segmentation methods**, based on nnU-net or MD-GRU.
+The **MIAC Automated Region Segmentation (MARS) for white matter hyperintensities (WMH)** is a state-of-the-art, deep learning-based segmentation tool that has undergone systematic validation, both technically and clinically.
+
+This repository includes ready-to-use, pre-built container images of two methods, based on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) or [MD-GRU](https://github.com/zubata88/mdgru), along with the code needed to build these images.
 
 The methods are described in detail in the following publication: 
  
-> Submitted. To be added.
+> Submitted. To be added. Please contact us if you would like to use MARS-WMH and publish your work before our method publication becomes available.
 
-Please make sure to cite this publication when using the methods, and please note that the [license](https://github.com/miac-research/dl-wmh/blob/main/LICENSE) does not cover any commercial use (defined as use for which any financial return is received).
+Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
 > [!CAUTION]
-> These methods are **NOT a medical device** and **for non-commercial, academic research use only!**  
+> These methods are **NOT medical devices** and **for non-commercial, academic research use only!**  
 > Do NOT use these methods for diagnosis, prognosis, monitoring or any other purposes in clinical use.
 
 ## Using the pre-built container images
 
-Ready-to-use, pre-built images for nnU-Net and MD-GRU WMH segmentaion are available for download from the [Github container registry](https://github.com/miac-research/dl-wmh/packages). The images have been tested with Apptainer and Docker. 
+Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/dl-brainstem/packages). The images have been tested with Apptainer and Docker.  
 
 In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
 ### Hardware requirements
 
-While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will greatly accelerate the calculation. The pre-built images use CUDA 12 and can thus support a wide range of NVIDIA GPUs from compute capability 5.0 (Maxwell generation, 2014) to 9.0 (current generation). A minimum of 8 GB GPU memory is required.
+While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will greatly accelerate the calculation. The pre-built images use CUDA 12 and can thus support a wide range of NVIDIA GPUs from compute capability 5.0 (Maxwell generation, 2014) to 9.0 (Hopper generation, 2022). The nnU-Net method should also work up to compute capability 12.0 (Blackwell generation, 2024), but this is untested. Please report any errors you encounter on the [Issues page](https://github.com/miac-research/MARS-WMH/issues). A minimum of 8 GB GPU memory is required.
+
 
 ### nnU-Net algorithm using Apptainer
 
@@ -85,3 +88,18 @@ If you do not want to use the pre-built images, you can build them yourself loca
 
 > [!NOTE]
 > During building, multiple external sources need to be used, e.g., base images are downloaded from the NVIDIA NGC registry, scripts are download from this Github repository, and larger model files are downloaded from Zenodo. Make sure you can access all required external sources in your build environment.
+
+## Licenses of redistributed software
+
+Please note the license terms of software components that we redistribute within our container images:
+
+- [HD-BET](https://github.com/MIC-DKFZ/HD-BET?tab=Apache-2.0-1-ov-file)
+- [3D Slicer](https://github.com/Slicer/Slicer/tree/main?tab=License-1-ov-file)
+- [nnU-Net](https://github.com/MIC-DKFZ/nnUNet?tab=Apache-2.0-1-ov-file)
+- [MD-GRU](https://github.com/zubata88/mdgru?tab=LGPL-2.1-1-ov-file)
+
+## Funding
+
+Development and maintenance of this software is funded by the [Medical Image Analysis Center (MIAC AG)](https://miac.swiss).
+
+[![MIAC Logo](http://miac.swiss/gallery/normal/116/miaclogo@2x.png)](https://miac.swiss)

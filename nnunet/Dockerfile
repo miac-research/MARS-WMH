@@ -15,12 +15,15 @@ RUN mkdir -p /libs \
  && ldd /build/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit | grep -o '/build[^ ]*' | xargs -I '{}' cp -v '{}' /libs/
  
 # Stage 2 
-FROM nvcr.io/nvidia/cuda:12.1.1-base-ubuntu22.04 AS final
+FROM nvcr.io/nvidia/cuda:12.8.1-base-ubuntu22.04 AS final
 RUN adduser --system --no-create-home nonroot
 
-LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
+LABEL org.opencontainers.image.authors="https://miac.swiss"
+LABEL org.opencontainers.image.source="https://github.com/miac-research/MARS-WMH"
+LABEL org.opencontainers.image.url="https://github.com/miac-research/MARS-WMH"
+LABEL org.opencontainers.image.description="Ready-to-use container image for MARS-WMH using nnU-Net"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL version="1.0.0"
-LABEL maintainer="MIAC"
 
 # Create folder structure required by nnU-Net
 RUN mkdir -p /nnunet/raw \
@@ -37,11 +40,11 @@ ENV nnUNet_raw_data_base=/nnunet/raw \
     LANG="en_US.UTF-8" \
     LC_ALL="en_US.UTF-8"
 
-# Install OS dependencies and fix Locale error in Apptainer
+# Install OS dependencies and fix locale error in Apptainer
 RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
-    locales=2.35-0ubuntu3.8 \
-    python3=3.10.6-1~22.04 \
-	python3-pip=22.0.2+dfsg-1ubuntu0.4 \
+	locales=2.35-0ubuntu3.9 \
+	python3=3.10.6-1~22.04.1 \
+	python3-pip=22.0.2+dfsg-1ubuntu0.5 \
 	python-is-python3=3.9.2-2 \
     wget=1.21.2-2ubuntu1.1 \
  && apt-get clean \
@@ -64,7 +67,9 @@ RUN pip install --no-cache-dir --upgrade pip==24.1.1 \
     
 # nnU-Net model
 WORKDIR /nnunet/results/nnUNet/3d_fullres/Task700_WMH/nnUNetTrainerV2__nnUNetPlansv2.1_8GB_iso1mm
-COPY files/nnUNet_wmh/. .
+RUN wget -nv -O nnUNet_wmh.tar.gz https://zenodo.org/records/15173303/files/nnUNet_wmh.tar.gz?download=1 \
+ && tar xvf nnUNet_wmh.tar.gz -C ./ \
+ && rm nnUNet_wmh.tar.gz
 
 # HD-BET
 WORKDIR /opt
@@ -93,9 +98,9 @@ ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 
 # Download Python pipeline script
 WORKDIR /opt/scripts/
-COPY files/pipeline_nnunet.py /opt/scripts/pipeline_nnunet.py
-COPY files/create_qc_image.py /opt/scripts/create_qc_image.py
-COPY files/create_html_with_png.py /opt/scripts/create_html_with_png.py
+RUN wget -nv -O pipeline_nnunet.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/nnunet/files/pipeline_nnunet.py \
+ && wget -nv -O create_qc_image.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/nnunet/files/create_qc_image.py \
+ && wget -nv -O create_html_with_png.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/nnunet/files/create_html_with_png.py
 
 # Entrypoint
 USER nonroot

@@ -18,9 +18,12 @@ RUN mkdir -p /libs \
 FROM nvcr.io/nvidia/tensorflow:23.03-tf1-py3 AS final
 RUN adduser --system --no-create-home nonroot
 
-LABEL org.opencontainers.image.source="https://github.com/miac-research/dl-wmh"
+LABEL org.opencontainers.image.authors="https://miac.swiss"
+LABEL org.opencontainers.image.source="https://github.com/miac-research/MARS-WMH"
+LABEL org.opencontainers.image.url="https://github.com/miac-research/MARS-WMH"
+LABEL org.opencontainers.image.description="Ready-to-use container image for MARS-WMH using MD-GRU"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL version="1.0.0"
-LABEL maintainer="MIAC"
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     DEBIAN_FRONTEND=noninteractive \
@@ -51,9 +54,9 @@ RUN git reset --hard 791ee4f
 
 # Download MD-GRU model
 WORKDIR /model
-COPY model/WMH_170000.data-00000-of-00001 .
-COPY model/WMH_170000.index .
-COPY model/WMH_170000.meta .
+RUN wget -nv -O brainstem_140000.data-00000-of-00001 https://zenodo.org/records/15173318/files/WMH_170000.data-00000-of-00001?download=1 \
+ && wget -nv -O brainstem_140000.index https://zenodo.org/records/15173318/files/WMH_170000.index .index?download=1 \
+ && wget -nv -O brainstem_140000.meta https://zenodo.org/records/15173318/files/WMH_170000.meta.meta?download=1
 
 # HD-BET
 WORKDIR /opt
@@ -82,9 +85,9 @@ ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 
 # Download Python pipeline script
 WORKDIR /opt/scripts/
-COPY files/pipeline_mdgru.py /opt/scripts/pipeline_mdgru.py
-COPY files/create_qc_image.py /opt/scripts/create_qc_image.py
-COPY files/create_html_with_png.py /opt/scripts/create_html_with_png.py
+RUN wget -nv -O pipeline_mdgru.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/mdgru/files/pipeline_mdgru.py \
+ && wget -nv -O create_qc_image.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/mdgru/files/create_qc_image.py \
+ && wget -nv -O create_html_with_png.py https://raw.githubusercontent.com/miac-research/MARS-WMH/refs/heads/main/mdgru/files/create_html_with_png.py
 
 # Entrypoint
 USER nonroot
