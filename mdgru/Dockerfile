@@ -36,6 +36,8 @@ RUN pip3 install --no-cache-dir \
 	setproctitle==1.2.2 \
 	visdom==0.1.8.9 \
 	pandas==1.5.2 \
+	imageio==2.35.1 \
+    matplotlib==3.7.5 \
  && pip3 install --no-cache-dir --no-deps git+https://github.com/spezold/mvloader.git@4244ba3 \
  && pip3 install --no-cache-dir --no-deps --force-reinstall \
 	future==0.18.2 \
@@ -81,6 +83,8 @@ ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 # Download Python pipeline script
 WORKDIR /opt/scripts/
 COPY files/pipeline_mdgru.py /opt/scripts/pipeline_mdgru.py
+COPY files/create_qc_image.py /opt/scripts/create_qc_image.py
+COPY files/create_html_with_png.py /opt/scripts/create_html_with_png.py
 
 # Entrypoint
 USER nonroot

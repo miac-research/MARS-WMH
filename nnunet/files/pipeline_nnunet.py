@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 '''
 Description:
-MD-GRU pipeline for WMH segmentation, taking additionally care of:
+nnU-Net pipeline for WMH segmentation, taking additionally care of:
     1. axes orientation - if not RAS+ or LAS+, image will be reoriented to RAS+
-    2. image resolution - has to be within range [0.95 mm, 1.05 mm] in each dimension, 
-        otherwise will be resliced to 1 mm isotropic
+    2. image resolution - will be reported, but not adjusted, since nnU-Net is doing this
     3. image registration - optional; T1w will be registered to FLAIR using Slicer software; this step needs brain masks which will be created with HD-BET
 
 '''
@@ -22,6 +21,9 @@ import string
 import random
 import pandas as pd
 import torch
+from create_qc_image import create_qc_image
+from create_html_with_png import create_html_with_png
+
 
 def run_subprocess(cmd, verbose, label):
     if verbose: print(f"Calling {label} command with:")
@@ -34,6 +36,30 @@ def run_subprocess(cmd, verbose, label):
         raise ValueError(f"ERROR during call of {label} command! For stdout/stderr of the command see above!")
     else:
         if verbose: print(output.stdout.decode("utf-8"))
+
+
+def nifti_sanity_check(fname, label):
+    
+    nii = nib.load(fname)
+    sform = nii.header.get_sform()
+    qform = nii.header.get_qform()
+    if nib.aff2axcodes(sform) != nib.aff2axcodes(qform):
+        print(f"\nWarning: 'sform' and 'qform' of affine matrix in {label} image have different axes orientation!")
+        
+        if np.all(nii.header.get_best_affine() == qform):
+            print("Warning: Using qform, as suggested by Nibabel's 'best_affine'")
+            nii.set_sform(qform, code="scanner")
+            nib.save(nii, fname)
+        elif np.all(nii.header.get_best_affine() == sform):
+            print("Warning: Using sform, as suggested by Nibabel's 'best_affine'")
+            nii.set_qform(sform, code="scanner") #--- remember that qform cannot store sheers!
+            nib.save(nii, fname)
+        else:
+            print("Warning: It is not possible to figure out, which one is correct! Trying with qform!")
+            #--- Nothing to do here, since this is done anyways later
+
+        print("Warning: However, please check resulting registration of T1w to FLAIR!!!")
+
 
 def qfrom_2_sform_and_compress(fname_in, fname_out=None):
     
@@ -62,56 +88,6 @@ def reorient_to_RAS(fname):
         niiRAS.header.set_slope_inter(1, 0)
     nib.save(niiRAS, fname)
 
-def apply_mask(fname_image, fname_mask):
-    img = sitk.ReadImage(fname_image)
-    mask = sitk.ReadImage(fname_mask)
-    arr = sitk.GetArrayFromImage(img)
-    mask = sitk.GetArrayFromImage(mask)
-    arr[mask<=0] = 0
-    res = sitk.GetImageFromArray(arr)
-    res.CopyInformation(img)
-    sitk.WriteImage(res, fname_image)
-
-def change_spacing(image, resampled, out_spacing=[1.0, 1.0, 1.0], interpolator=None):
-    
-    # Resample images to 1mm isotropic spacing
-
-    if resampled is None:
-        resampled = image
-    
-    img = sitk.ReadImage(image)
-
-    original_spacing = img.GetSpacing()
-    original_size = img.GetSize()
-
-    out_size = [
-        int(np.round(original_size[0] * (original_spacing[0] / out_spacing[0]))),
-        int(np.round(original_size[1] * (original_spacing[1] / out_spacing[1]))),
-        int(np.round(original_size[2] * (original_spacing[2] / out_spacing[2])))]
-
-    resample = sitk.ResampleImageFilter()
-    resample.SetOutputSpacing(out_spacing)
-    resample.SetSize(out_size)
-    resample.SetOutputDirection(img.GetDirection())
-    resample.SetOutputOrigin(img.GetOrigin())
-    resample.SetTransform(sitk.Transform())
-    resample.SetDefaultPixelValue(img.GetPixelIDValue())
-
-    if interpolator is None:
-        # print('Using nearest neighbor interpolation')
-        interpolator=sitk.sitkNearestNeighbor
-    resample.SetInterpolator(interpolator)
-
-    resT = resample.Execute(img)
-
-    # Set negative values to zero
-    arr = sitk.GetArrayFromImage(resT)
-    arr[arr<0] = 0
-    res = sitk.GetImageFromArray(arr)
-    res.CopyInformation(resT)
-
-    sitk.WriteImage(res, resampled)
-
 def hdbet(head, brain, verbose=True):
     if not torch.cuda.is_available():
         cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast'
@@ -137,7 +113,7 @@ def dilate_brainmask(fn, fnNew=None):
 
 def register_with_slicer(fixed, moving, fixedMask, movingMask, registered, verbose=True):
     registered = re.sub('\.nii(\.gz)?$', '', registered) #- remove extension, which will be added below
-    slicer = (f'/opt/Slicer-4.10.2-linux-amd64/lib/Slicer-4.10/cli-modules/BRAINSFit --fixedVolume "{fixed}" --movingVolume "{moving}" --initializeTransformMode useCenterOfROIAlign'
+    slicer = (f'/opt/BRAINSFit/BRAINSFit --fixedVolume "{fixed}" --movingVolume "{moving}" --initializeTransformMode useCenterOfROIAlign'
     f' --outputTransform "{registered}.h5" --outputVolume "{registered}.nii.gz"' +
     f' --outputVolumePixelType float --samplingPercentage 0.1' +
     f' --transformType Rigid,Affine --translationScale 700 --interpolationMode WindowedSinc' +
@@ -169,22 +145,8 @@ def resample(image, reference=None, resampled=None, interpolator=None, transform
                          interpolator, default_value)
     
     sitk.WriteImage(res, resampled)
-
-def flip_axes(fnIn, fnOut=None, axis=0):
-    # Load image and flip one or multiple axes
-    img = sitk.ReadImage(fnIn)
-    arr = sitk.GetArrayFromImage(img)
-    # With sitk axes order is reversed with respect to Nibabel, therefore start counting with last axis
-    if isinstance(axis, (list, tuple)):
-        axis = tuple([-1 - x for x in axis])
-    elif axis is not None:
-        axis = -1 - axis
-    arr = np.flip(arr, axis)
-    res = sitk.GetImageFromArray(arr)
-    res.CopyInformation(img)
-    if fnOut is None: fnOut = fnIn
-    sitk.WriteImage(res, fnOut)
     
+
 def extract_statistics(fn):
     nii = nib.load(fn)
     arr = nii.get_fdata()
@@ -195,29 +157,17 @@ def extract_statistics(fn):
     df = pd.DataFrame({'Name': ['volume','voxels','clusters'], 'Value': [round(volume,1), voxels, clusters], 'Unit': ['mm^3','count','count']}, dtype='object')
     return df
 
-def mdgru_prediction(flair, t1, fnOutTrunk='mdgru', verbose=True):
 
-    dir_input = dirname(flair)
-    modelCkpt="/model/WMH_170000"
+def nnunet_prediction(dirInput, verbose=True):
     cmd = (
-        'python3 /opt/mdgru/RUN_mdgru.py'
-        f' -f "{basename(flair)}" "{basename(t1)}" --optionname "{fnOutTrunk}"'
-        f' --datapath "{dir_input}"'  
-        f' --locationtesting . --locationtraining .  --locationvalidation .'
-        f' --ckpt "{modelCkpt}"'
-        f' --num_threads 4 -w 100 100 100 -p 20 20 20'
-        f' --dont_correct_orientation  --nclasses 2 --only_test'
+        'nnUNet_predict'
+        f' -i "{dirInput}" -o "{dirInput}"'
+        ' -tr nnUNetTrainerV2 -m 3d_fullres -p nnUNetPlansv2.1_8GB_iso1mm -t Task700_WMH'
     )
-    run_subprocess(cmd, verbose, label="MD-GRU")
-
-    # expected output filenames
-    labelmap = join(dir_input, fnOutTrunk+"-labels.nii.gz")
-    probdist = join(dir_input, fnOutTrunk+"-probdist.nii.gz")
-    
-    return probdist, labelmap
+    run_subprocess(cmd, verbose, label="nnU-Net")
 
 
-def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, saveStatistics=False, verbose=True, debug=False):
+def pipeline_nnunet(flair, t1, wmh_mask, skipRegistration=False, saveStatistics=False, verbose=True, debug=False):
     
     start_script = time.time()
     if verbose: print(f"Segmenting WMH from:\n"
@@ -245,7 +195,11 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
     t1_in = t1
     t1 = join(dirTemp, basename(t1))
     copy2(src=t1_in, dst=t1)
-   
+
+    # Sanity check of NIfTI header
+    nifti_sanity_check(flair, 'FLAIR')
+    nifti_sanity_check(t1, 'T1w')
+
     # Copy qform to sform, to ensure consistent header
     flair = qfrom_2_sform_and_compress(flair)
     t1 = qfrom_2_sform_and_compress(t1)
@@ -272,40 +226,30 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         reorient_to_RAS(t1)
     if verbose: print('')
 
-    # Check and correct image resolution 
+    # Check resolution (no action required, since resolution is handled by nnU-Net)
     zoomsFL = np.array(niiFL.header.get_zooms()[0:3])
     if verbose: print(f'FLAIR resolution is {zoomsFL}')
     zoomsT1 = np.array(niiT1.header.get_zooms()[0:3])
     if verbose: print(f'T1w   resolution is {zoomsT1}')
     if skipRegistration and (zoomsT1 != zoomsFL).any():
             raise ValueError('When providing registered FLAIR and T1w as input, the resolution must match! Please check registration of input images or let the pipeline do the registration!')
-    reslice_flag = False
-    if any(zoomsFL < 0.95) or any(zoomsFL > 1.05) :
-        if verbose: print('FLAIR resolution is out of expected range [0.95,1.05]')
-        if verbose: print('Reslicing FLAIR into 1 mm isotropic voxel grid')
-        # interpolator = sitk.sitkHammingWindowedSinc
-        interpolator = sitk.sitkBSpline
-        change_spacing(flair, flair, out_spacing=[1.0, 1.0, 1.0], interpolator=interpolator)
-        reslice_flag = True
-    if reslice_flag and skipRegistration:
-        if verbose: print('Reslicing T1w into 1 mm isotropic voxel grid')
-        # interpolator = sitk.sitkHammingWindowedSinc
-        interpolator = sitk.sitkBSpline
-        change_spacing(t1, t1, out_spacing=[1.0, 1.0, 1.0], interpolator=interpolator)
     if verbose: print('')
 
 
-    # Create brain mask for FLAIR
-    flair_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', flair)
-    flair_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', flair)
-    start = time.time()
-    hdbet(flair, flair_brain, verbose)
-    end = time.time()
-    if verbose: print(f"Duration HDBET: {end - start}\n")
-
     if skipRegistration:
+
         t1_rFlair = t1
+        flair_bmask = None
+    
     else:
+
+        # Create brain mask for FLAIR
+        flair_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', flair)
+        flair_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', flair)
+        start = time.time()
+        hdbet(flair, flair_brain, verbose)
+        end = time.time()
+        if verbose: print(f"Duration HDBET: {end - start}\n")
         # Create brain mask for T1w
         t1_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', t1)
         t1_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', t1)
@@ -328,132 +272,52 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         if verbose: print(f"Duration registration: {end - start}\n")
 
     
-    if verbose: print('Applying brain mask to FLAIR and T1w')
-    apply_mask(flair, flair_bmask)
-    apply_mask(t1_rFlair, flair_bmask)
-    if verbose: print('')
+    # Copy FLAIR and registered-T1 to dedicated nnU-Net folder, adding suffix "_0000/_0001" as modality identifier for nnU-Net
+    dirNnunet = join(dirTemp, 'nnUNet')
+    Path(dirNnunet).mkdir()
+    if verbose: print('Organising input for nnU-Net:')
+    temp = copy2(src=flair,     dst=join(dirNnunet, 'wmh_0000.nii.gz'))
+    if verbose: print(f'   {flair} -> {temp}')
+    temp = copy2(src=t1_rFlair, dst=join(dirNnunet, 'wmh_0001.nii.gz'))
+    if verbose: print(f'   {t1_rFlair} -> {temp}\n')
 
-    # Predict WMH using MD-GRU
+    # Predict WMH using nnU-Net
     start = time.time()
-    probdist, labelmap = mdgru_prediction(flair, t1_rFlair, 'mdgru', verbose)
+    labelmap = nnunet_prediction(dirNnunet, verbose)
     end = time.time()
-    if verbose: print(f"Duration MD-GRU: {end - start}\n")   
-
-    # Reinsert sform, because mdgru deletes the sform
-    qfrom_2_sform_and_compress(probdist)
+    if verbose: print(f"Duration nnU-Net: {end - start}\n")
+    
+    # Expected output filename is constructed by removing modality index
+    labelmap = join(dirNnunet, 'wmh.nii.gz')
     qfrom_2_sform_and_compress(labelmap)
 
-    # Keep only the probability map for label 1 (label 0 is the background and is complementary)
-    nii = nib.load(probdist)
-    nii = nii.slicer[..., 1]
-    nii.to_filename(probdist)
-
-    # Predict WMH for the flipped images
-    if not flip:
-        probdist_avg = probdist
-        labelmap_avg = labelmap
-
+    if reorient_flag:
+        if verbose: print('\nReorienting label map according to original axes orientation')    
+        resample(image=labelmap, reference=flair_in, resampled=wmh_mask, interpolator=sitk.sitkNearestNeighbor)
+        if verbose: print(f'Label map was saved to: {wmh_mask}')
     else:
-        # flip images
-        if verbose: print('Flipping images left/richt and running MD-GRU again:')
-        flair_flipped = re.sub('\.nii(\.gz)?$', '_flipped.nii.gz', flair)
-        flip_axes(flair, flair_flipped, axis=0)
-        t1_rFlair_flipped = re.sub('\.nii(\.gz)?$', '_flipped.nii.gz', t1_rFlair)
-        flip_axes(t1_rFlair, t1_rFlair_flipped, axis=0)
-        if verbose: print('')
-        # Predict WMH for flipped images
-        start = time.time()
-        probdistFlipped, labelmapFlipped = mdgru_prediction(flair_flipped, t1_rFlair_flipped, 'mdgru-for-flipped', verbose)
-        end = time.time()
-        if verbose: print(f"Duration MD-GRU: {end - start}\n")
-
-        # Reinsert sform, because mdgru deletes the sform
-        qfrom_2_sform_and_compress(probdistFlipped)
-        qfrom_2_sform_and_compress(labelmapFlipped)
-
-        # Keep only the probability map for label 1 (label 0 is the background and is complementary)
-        nii = nib.load(probdistFlipped)
-        nii = nii.slicer[..., 1]
-        nii.to_filename(probdistFlipped)
-
-        # Reverse L/R flip
-        if verbose: print('Flipping MD-GRU output back to original left/right orientation')
-        flip_axes(probdistFlipped, probdistFlipped, axis=0)
-        flip_axes(labelmapFlipped, labelmapFlipped, axis=0)
-
-        # Average the probability maps for flipped and none flipped images
-        if verbose: print('Averaging the probability maps for flipped and non-flipped images')
-        img1 = sitk.ReadImage(probdist)
-        img2 = sitk.ReadImage(probdistFlipped)
-        arr1 = sitk.GetArrayFromImage(img1)
-        arr2 = sitk.GetArrayFromImage(img2)
-        arr = np.mean( np.stack((arr1,arr2)) , axis=0 )
-        res = sitk.GetImageFromArray(arr)
-        res.CopyInformation(img1)
-        probdist_avg = re.sub('\.nii(\.gz)?$', '_averaged.nii.gz', probdist)
-        sitk.WriteImage(res, probdist_avg)
-        
-        # Threshold the averaged probability map, to get a new labelmap (although this is not always used later)
-        if verbose: print('Thresholding the averaged probability map')
-        arr = (arr >= 0.5) * 1
-        res = sitk.GetImageFromArray(arr)
-        res.CopyInformation(img1)
-        labelmap_avg = re.sub('\.nii(\.gz)?$', '_averaged.nii.gz', labelmap)
-        sitk.WriteImage(res, labelmap_avg)
-
-
-    if reslice_flag:
-        '''
-        Reslicing reverses both:
-            1. reorientation to RAS+ (if this was done at the beginning)
-            2. reslicing into 1 mm  isotropic space (if this was done at the beginning)
-        '''
-        if verbose: print('Applying brain mask')
-        apply_mask(probdist_avg, flair_bmask)
-        if verbose: print('Reslicing probability map into original voxel grid and thresholding it')
-        probdistResampled = probdist_avg.replace('.nii.gz',f'_resampled-as-input.nii.gz')
-        # interpolator = sitk.sitkHammingWindowedSinc
-        interpolator = sitk.sitkBSpline
-        start = time.time()
-        resample(image=probdist_avg, reference=flair_in, resampled=probdistResampled, interpolator=interpolator)
-        nii = nib.load(probdistResampled)
-        arr = nii.get_fdata()
-        arr = (arr >= 0.5) * 1
-        end = time.time()
-        if verbose: print(f"Duration reslicing: {end - start}\n")
-        if verbose: print(f'Saving label map to: {wmh_mask}')
-        nii = nib.Nifti1Image(arr, nii.affine, nii.header)
-        nii.set_data_dtype("uint8")
-        nii.header.set_slope_inter(1, 0)
-        nib.save(nii, wmh_mask)
-
-    elif reorient_flag:
-        if verbose: print('\nApplying brain mask to segmentation')
-        apply_mask(labelmap_avg, flair_bmask)
-        if verbose: print('Reorienting label map according to original axes orientation')
-        labelmapResampled = labelmap_avg.replace('.nii.gz',f'_resampled-as-input.nii.gz')
-        resample(image=labelmap_avg, reference=flair_in, resampled=labelmapResampled, interpolator=sitk.sitkNearestNeighbor)
-        if verbose: print(f'Saving label map to: {wmh_mask}')
-        copy2(labelmapResampled, wmh_mask)
-
-    else:
-        if verbose: print('\nApplying brain mask to segmentation')
-        apply_mask(labelmap_avg, flair_bmask)
-        if verbose: print(f'Saving label map to: {wmh_mask}')
-        copy2(labelmap_avg, wmh_mask)
-
+        if verbose: print('\nNo postprocessing needed')
+        copy2(labelmap, wmh_mask)
+        if verbose: print(f'Label map was saved to: {wmh_mask}')
     
     # Extract statistics
-    if reslice_flag and verbose:
-        df = extract_statistics(labelmap_avg)
-        print(f'\nStatistics for WMH lesions in the 1 mm isotropic resliced mask:\n', df)
-    if verbose or saveStatistics:
-        df = extract_statistics(wmh_mask)
-        if verbose: print(f'\nStatistics for WMH lesions in output mask:\n ', df)
-        if saveStatistics:
-            wmh_stats = re.sub('\.nii(\.gz)?$', '.csv', wmh_mask)
-            df.to_csv(wmh_stats, index=False)
+    df = extract_statistics(wmh_mask)
+    if verbose: print(f'\nStatistics for WMH lesions in output mask:\n ', df)
+    if saveStatistics:
+        wmh_stats = re.sub('\.nii(\.gz)?$', '.csv', wmh_mask)
+        df.to_csv(wmh_stats, index=False)
 
+    # Create QC
+    if not args.omitQC:
+        fnHTML = re.sub('\.nii(\.gz)?$', '', wmh_mask) + '_QC.html'
+        if verbose: print(f'\nSaving QC image to:\n ', fnHTML)
+        fnPNG, aspect_ratio = create_qc_image([flair, t1_rFlair], labelmap, flair_bmask)
+        text=None
+        if flair_bmask is None:  text = ['Please note:',
+                                 'Brain mask was not calculated, because it is only needed for registration of T1w to FLAIR, which was skipped.',
+                                 'Therefore, the shown slices are not distributed over the entire brain, but only over the range containing WMH,',
+                                 'or over the entire image if no WMH were found.']
+        create_html_with_png(fnPNG, fnHTML, df, text, aspect_ratio)
 
 
     # Clean up
@@ -504,8 +368,8 @@ def iniParser():
     group1.add_argument("-d", "--dirOut", type=str, help="path to output folder, to which to write the WMH mask (if missing the parent folder of the path provided either with option '-o' or with option '--flair' will be used)")
     group1.add_argument("-x", "--overwrite", action='store_true', help="allow overwriting output file if existing. By default, already existing output will raise an error.")
     group1.add_argument("--saveStatistics", action='store_true', help="save WMH lesion statistics (i.e. volume, voxels, clusters) to CSV file. Filename will be the same as for the output WMH mask, but with extension '.csv'")
+    group1.add_argument("--omitQC", action='store_true', help="omit QC. By default an HTML will be created (names as the WMH mask, with suffix '_QC.html') showing FLAIR and T1w with WMH (red) and brain mask (cyan contour) as overlay.")
     group1.add_argument("--skipRegistration", action='store_true', help="skip affine registration of T1 to FLAIR, assuming that these images are already in register.")
-    group1.add_argument("--flip", action='store_true', help="run MD-GRU twice, once on the unmodified images and once on the left/right flipped images.")
     group1.add_argument("--debug", action='store_true', help="don't delete temporary processing folder to allow debugging.")
     group1.add_argument("--quiet", dest="quiet", action='store_true', help="suppress standard output to command line. Errors will still be displayed.")
     return parser
@@ -539,12 +403,12 @@ if __name__ == "__main__":
 
     # check availability GPU
     if not torch.cuda.is_available():
-        if verbose: print('\nWarning: No GPU found! HD-BET and MD-GRU will run on CPU, which could lead to slightly differnt results!\n')
+        if verbose: print('\nWarning: No GPU found! HD-BET and nnU-Net will run on CPU, which could lead to slightly differnt results!\n')
 
     # check whether output exists already, and raise error, if overwrite is false
     if os.path.exists(args.fnOut):
         if not args.overwrite:
             raise ValueError(f'Output label map "{args.fnOut}" exists already. If you want to overwrite, use option "-x".')
 
-    pipeline_mdgru(args.fnFLAIR, args.fnT1, args.fnOut, args.skipRegistration, args.flip, args.saveStatistics, verbose, args.debug)
-        
+    pipeline_nnunet(args.fnFLAIR, args.fnT1, args.fnOut, args.skipRegistration, args.saveStatistics, verbose, args.debug)
+    

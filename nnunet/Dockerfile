@@ -57,6 +57,8 @@ RUN pip install --no-cache-dir --upgrade pip==24.1.1 \
  	wheel==0.42.0 \
 	torch==2.1.1 \
 	nnunet==1.7.1 \
+    imageio==2.36.1 \
+    matplotlib==3.9.3 \
  && pip3 install --no-cache-dir --no-deps --force-reinstall \
     numpy==1.23.5
     
@@ -92,6 +94,8 @@ ENV LD_LIBRARY_PATH=/opt/BRAINSFit
 # Download Python pipeline script
 WORKDIR /opt/scripts/
 COPY files/pipeline_nnunet.py /opt/scripts/pipeline_nnunet.py
+COPY files/create_qc_image.py /opt/scripts/create_qc_image.py
+COPY files/create_html_with_png.py /opt/scripts/create_html_with_png.py
 
 # Entrypoint
 USER nonroot
