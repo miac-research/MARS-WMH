@@ -1,4 +1,4 @@
-# MARS-brainstem: Deep learning-based WMH segmentation
+# MARS-WMH: Deep learning-based white matter hyperintensity segmentation
 
 The **MIAC Automated Region Segmentation (MARS) for white matter hyperintensities (WMH)** is a state-of-the-art, deep learning-based segmentation tool that has undergone systematic validation, both technically and clinically.
 
@@ -16,7 +16,7 @@ Please ensure to cite this publication when using the methods, and please note t
 
 ## Using the pre-built container images
 
-Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/dl-brainstem/packages). The images have been tested with Apptainer and Docker.  
+Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker.  
 
 In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
