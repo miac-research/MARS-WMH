@@ -11,12 +11,12 @@ The methods are described in detail in the following publication:
 **Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use** (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
 > [!CAUTION]
-> These methods are **NOT medical devices** and **for non-commercial, academic research use only!**  
+> These methods are **NOT medical devices** and **for non-commercial, academic research use only!** 
 > Do NOT use these methods for diagnosis, prognosis, monitoring or any other purposes in clinical use.
 
 ## Using the pre-built container images
 
-Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker.  
+Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker. 
 
 In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
@@ -28,14 +28,14 @@ While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will
 ### nnU-Net algorithm using Apptainer
 
 ```shell
-# 1. Pull the container image and save as .sif file   
-apptainer build wmh-nnunet.sif docker://ghcr.io/miac-research/wmh-nnunet:latest
+# 1. Pull the container image and save as .sif file 
+apptainer build mars-wmh-nnunet.sif docker://ghcr.io/miac-research/wmh-nnunet:latest
 
 # 2. Run inference on a pair of FLAIR and T1w images in the current working directory using GPU (flag "--nv")
-apptainer run -B $(pwd) --nv wmh-nnunet.sif --flair FLAIR.nii.gz --t1 T1w.nii.gz
+apptainer run -B $(pwd) --nv mars-wmh-nnunet.sif --flair FLAIR.nii.gz --t1 T1w.nii.gz
 
 # For advanced usage, see available command line options:
-apptainer run wmh-nnunet.sif -h
+apptainer run mars-wmh-nnunet.sif -h
 ```
 
 ### nnU-Net algorithm using Docker
@@ -43,26 +43,26 @@ apptainer run wmh-nnunet.sif -h
 ```shell
 # 1. Pull the container image into your local registry
 docker pull ghcr.io/miac-research/wmh-nnunet:latest
-docker tag ghcr.io/miac-research/wmh-nnunet:latest wmh-nnunet:latest
+docker tag ghcr.io/miac-research/wmh-nnunet:latest mars-wmh-nnunet:latest
 
 # 2. Run inference on a pair of FLAIR and T1w images in the current working directory using GPU (flag "--gpus all")
-docker run --rm --gpus all -v $(pwd):/data  wmh-nnunet:latest --flair /data/FLAIR.nii.gz --t1 /data/T1w.nii.gz
+docker run --rm --gpus all -v $(pwd):/data mars-wmh-nnunet:latest --flair /data/FLAIR.nii.gz --t1 /data/T1w.nii.gz
 
 # For advanced usage, see available command line options:
-docker run --rm wmh-nnunet:latest -h
+docker run --rm mars-wmh-nnunet:latest -h
 ```
 
 ### MD-GRU algorithm using Apptainer
 
 ```shell
-# 1. Pull the container image and save as .sif file   
-apptainer build wmh-mdgru.sif docker://ghcr.io/miac-research/wmh-mdgru:latest
+# 1. Pull the container image and save as .sif file 
+apptainer build mars-wmh-mdgru.sif docker://ghcr.io/miac-research/wmh-mdgru:latest
 
 # 2. Run inference on a pair of FLAIR and T1w images in the current working directory using GPU (flag "--nv")
-apptainer run -B $(pwd) --nv wmh-mdgru.sif --flair FLAIR.nii.gz --t1 T1w.nii.gz
+apptainer run -B $(pwd) --nv mars-wmh-mdgru.sif --flair FLAIR.nii.gz --t1 T1w.nii.gz
 
 # For advanced usage, see available command line options:
-apptainer run wmh-mdgru.sif -h
+apptainer run mars-wmh-mdgru.sif -h
 ```
 
 ### MD-GRU algorithm using Docker
@@ -70,13 +70,13 @@ apptainer run wmh-mdgru.sif -h
 ```shell
 # 1. Pull the container image into your local registry
 docker pull ghcr.io/miac-research/wmh-mdgru:latest
-docker tag ghcr.io/miac-research/wmh-mdgru:latest wmh-mdgru:latest
+docker tag ghcr.io/miac-research/wmh-mdgru:latest mars-wmh-mdgru:latest
 
 # 2. Run inference on a pair of FLAIR and T1w images in the current working directory using GPU (flag "--gpus all")
-docker run --rm --gpus all -v $(pwd):/data  wmh-mdgru:latest --flair /data/FLAIR.nii.gz --t1 /data/T1w.nii.gz
+docker run --rm --gpus all -v $(pwd):/data mars-wmh-mdgru:latest --flair /data/FLAIR.nii.gz --t1 /data/T1w.nii.gz
 
 # For advanced usage, see available command line options:
-docker run --rm wmh-mdgru:latest -h
+docker run --rm mars-wmh-mdgru:latest -h
 ```
 
 ## Building the container images yourself
