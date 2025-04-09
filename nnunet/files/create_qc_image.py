@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 #
-import re
+import os, string, random, re
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_cache_'+''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
 import nibabel as nib
-import matplotlib.pyplot as plt
 import imageio.v3 as iio
 
 #
