@@ -1,6 +1,6 @@
 # MARS-WMH: Deep learning-based white matter hyperintensity segmentation
 
-The **MIAC Automated Region Segmentation (MARS) for white matter hyperintensities (WMH)** is a state-of-the-art, deep learning-based segmentation tool that has undergone systematic validation, both technically and clinically.
+The **MIAC Automated Region Segmentation (MARS) for White Matter Hyperintensities (WMH)** is a state-of-the-art, deep learning-based segmentation tool that has undergone systematic validation, both technically and clinically.
 
 This repository includes ready-to-use, pre-built container images of two methods, based on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) or [MD-GRU](https://github.com/zubata88/mdgru), along with the code needed to build these images.
 
@@ -18,7 +18,7 @@ The methods are described in detail in the following publication:
 
 Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker. 
 
-In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
+**In general, we recommend the nnU-Net algorithm** (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
 ### Hardware requirements
 
@@ -84,7 +84,7 @@ docker run --rm mars-wmh-mdgru:latest -h
 If you do not want to use the pre-built images, you can build them yourself locally using the provided Dockerfiles in the `mdgru` and `nnunet` folders.
 
 1. Download the mdgru or nnunet Dockerfile and place it into a local folder.
-2. In this folder, run `docker build -t wmh-{mdgru/nnunet} .`
+2. In this folder, run `docker build -t mars-wmh-{mdgru/nnunet} .`
 
 > [!NOTE]
 > During building, multiple external sources need to be used, e.g., base images are downloaded from the NVIDIA NGC registry, scripts are download from this Github repository, and larger model files are downloaded from Zenodo. Make sure you can access all required external sources in your build environment.
