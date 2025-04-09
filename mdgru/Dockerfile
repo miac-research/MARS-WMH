@@ -55,8 +55,8 @@ RUN git reset --hard 791ee4f
 # Download MD-GRU model
 WORKDIR /model
 RUN wget -nv -O brainstem_140000.data-00000-of-00001 https://zenodo.org/records/15173318/files/WMH_170000.data-00000-of-00001?download=1 \
- && wget -nv -O brainstem_140000.index https://zenodo.org/records/15173318/files/WMH_170000.index .index?download=1 \
- && wget -nv -O brainstem_140000.meta https://zenodo.org/records/15173318/files/WMH_170000.meta.meta?download=1
+ && wget -nv -O brainstem_140000.index https://zenodo.org/records/15173318/files/WMH_170000.index?download=1 \
+ && wget -nv -O brainstem_140000.meta https://zenodo.org/records/15173318/files/WMH_170000.meta?download=1
 
 # HD-BET
 WORKDIR /opt

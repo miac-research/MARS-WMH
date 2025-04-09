@@ -61,9 +61,7 @@ RUN pip install --no-cache-dir --upgrade pip==24.1.1 \
 	torch==2.1.1 \
 	nnunet==1.7.1 \
     imageio==2.36.1 \
-    matplotlib==3.9.3 \
- && pip3 install --no-cache-dir --no-deps --force-reinstall \
-    numpy==1.23.5
+    matplotlib==3.9.3
     
 # nnU-Net model
 WORKDIR /nnunet/results/nnUNet/3d_fullres/Task700_WMH/nnUNetTrainerV2__nnUNetPlansv2.1_8GB_iso1mm
@@ -74,7 +72,7 @@ RUN wget -nv -O nnUNet_wmh.tar.gz https://zenodo.org/records/15173303/files/nnUN
 # HD-BET
 WORKDIR /opt
 RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
-    git=1:2.34.1-1ubuntu1.11 \
+    git=1:2.34.1-1ubuntu1.12 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && git clone https://github.com/MIC-DKFZ/HD-BET \
@@ -88,7 +86,9 @@ RUN apt-get update -qq && apt-get install -y -q --no-install-recommends \
  && wget -nv --no-check-certificate -O /opt/HD-BET_models/1.model https://zenodo.org/record/2540695/files/1.model?download=1 \
  && wget -nv --no-check-certificate -O /opt/HD-BET_models/2.model https://zenodo.org/record/2540695/files/2.model?download=1 \
  && wget -nv --no-check-certificate -O /opt/HD-BET_models/3.model https://zenodo.org/record/2540695/files/3.model?download=1 \
- && wget -nv --no-check-certificate -O /opt/HD-BET_models/4.model https://zenodo.org/record/2540695/files/4.model?download=1
+ && wget -nv --no-check-certificate -O /opt/HD-BET_models/4.model https://zenodo.org/record/2540695/files/4.model?download=1 \
+ && pip3 install --no-cache-dir --no-deps --force-reinstall \
+    numpy==1.24.4
 
 # Slicer BRAINSfit from Stage 1
 WORKDIR /opt/BRAINSFit
