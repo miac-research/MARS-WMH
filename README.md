@@ -20,6 +20,12 @@ Ready-to-use, pre-built images are available for download from the [Github conta
 
 **In general, we recommend the nnU-Net algorithm** (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
+### Data requirements
+
+The WMH segmentation requires two inputs, a **FLAIR image and a T1-weighted image**, both in NIfTI-1 data format. We recommend [dcm2niix](https://github.com/rordenlab/dcm2niix) for DICOM to NIfTI conversion. Ensure that the entire brain is covered by the field of view. By default, the T1-weighted image will be registered to the FLAIR. However, already registered images can be provided as well (see option `-skipRegistration`).  
+- **FLAIR image**: A 3D FLAIR with 1 mm isotropic resolution is recommended.§D images with different resolution will be resliced to 1mm isotropic before prediction, while WMH masks are returned in the original resolution. A 2D FLAIR with up to 3 mm slice thickness can also be used. Images with thicker slices are not recommended.  
+- **T1-weighted image**: The recommended resolution is 1 mm isotropic.
+
 ### Hardware requirements
 
 While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will greatly accelerate the calculation. The pre-built images use CUDA 12 and can thus support a wide range of NVIDIA GPUs from compute capability 5.0 (Maxwell generation, 2014) to 9.0 (Hopper generation, 2022). The nnU-Net method should also work up to compute capability 12.0 (Blackwell generation, 2024), but this is untested. Please report any errors you encounter on the [Issues page](https://github.com/miac-research/MARS-WMH/issues). A minimum of 8 GB GPU memory is required.
