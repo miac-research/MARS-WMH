@@ -90,7 +90,7 @@ def reorient_to_RAS(fname):
 
 def hdbet(head, brain, verbose=True):
     if not torch.cuda.is_available():
-        cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast'
+        cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast -tta 0'
     else:
         cmd = f'hd-bet -i "{head}" -o "{brain}"'
     run_subprocess(cmd, verbose, label="HDBET")

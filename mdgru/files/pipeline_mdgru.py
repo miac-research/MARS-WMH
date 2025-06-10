@@ -142,12 +142,23 @@ def change_spacing(image, resampled, out_spacing=[1.0, 1.0, 1.0], interpolator=N
     sitk.WriteImage(res, resampled)
 
 def hdbet(head, brain, verbose=True):
-    if not torch.cuda.is_available():
-        cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast'
-    else:
-        cmd = f'hd-bet -i "{head}" -o "{brain}"'
-    run_subprocess(cmd, verbose, label="HDBET")
     
+    if torch.cuda.is_available():
+        major, minor = torch.cuda.get_device_capability(torch.cuda.current_device())
+        arch_str = f"sm_{major}"
+        if any(string.startswith(arch_str) for string in torch.cuda.get_arch_list()):
+            gpu_available = True
+        else:
+            print(f'CUDA capability sm_{major}{minor} is not compatible with the current PyTorch installation.\nUsing CPU instead of GPU for HD-BET.')
+            gpu_available= False  
+    else:
+        gpu_available = False
+
+    if gpu_available:
+        cmd = f'hd-bet -i "{head}" -o "{brain}"'
+    else:
+        cmd = f'hd-bet -i "{head}" -o "{brain}" -device cpu -mode fast -tta 0'
+    run_subprocess(cmd, verbose, label="HDBET")    
 
 def dilate_brainmask(fn, fnNew=None):
     nii = nib.load(fn)
