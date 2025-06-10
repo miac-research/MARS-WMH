@@ -6,9 +6,9 @@ This repository includes ready-to-use, pre-built container images of two methods
 
 The methods are described in detail in the following publication: 
  
-> Submitted. To be added. Please contact us if you would like to use MARS-WMH and publish your work before our method publication becomes available.
+> Submitted. Please contact us if you would like to use MARS-WMH and publish your work before our method publication becomes available.
 
-**Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use** (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
+Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
 > [!CAUTION]
 > These methods are **NOT medical devices** and **for non-commercial, academic research use only!** 
@@ -18,18 +18,25 @@ The methods are described in detail in the following publication:
 
 Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker. 
 
-**In general, we recommend the nnU-Net algorithm** (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
+In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
 ### Data requirements
 
 The WMH segmentation requires two inputs, a **FLAIR image and a T1-weighted image**, both in NIfTI-1 data format. We recommend [dcm2niix](https://github.com/rordenlab/dcm2niix) for DICOM to NIfTI conversion. Ensure that the entire brain is covered by the field of view. By default, the T1-weighted image will be registered to the FLAIR. However, already registered images can be provided as well (see option `-skipRegistration`).  
 - **FLAIR image**: A 3D FLAIR with 1 mm isotropic resolution is recommended.§D images with different resolution will be resliced to 1mm isotropic before prediction, while WMH masks are returned in the original resolution. A 2D FLAIR with up to 3 mm slice thickness can also be used. Images with thicker slices are not recommended.  
-- **T1-weighted image**: The recommended resolution is 1 mm isotropic.
+- **T1-weighted image**: The recommended resolution is 1 mm isotropic. The image must have been acquired without the use of a contrast agent.
 
 ### Hardware requirements
 
-While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will greatly accelerate the calculation. The pre-built images use CUDA 12 and can thus support a wide range of NVIDIA GPUs from compute capability 5.0 (Maxwell generation, 2014) to 9.0 (Hopper generation, 2022). The nnU-Net method should also work up to compute capability 12.0 (Blackwell generation, 2024), but this is untested. Please report any errors you encounter on the [Issues page](https://github.com/miac-research/MARS-WMH/issues). A minimum of 8 GB GPU memory is required.
+While the inference can be run on CPU (>8 cores recommended), an NVIDIA GPU will greatly accelerate the calculation. The pre-built images support a wide range of NVIDIA GPUs from compute capability 5.0 (Maxwell, 2014) to 12.0 (Blackwell, 2024), please see the table for details:
 
+| NVIDIA CUDA Compute Capability          | nnU-Net image | MD-GRU image |
+| --------------------------------------- | ------------- | ------------ |
+| 12.0 (Blackwell, 2024)                  | supported     | limited*     |
+| 7.5 (Turing, 2018) – 9.0 (Hopper, 2022) | supported     | supported    |
+| 5.0 (Maxwell, 2014) – 7.0 (Volta, 2017) | only [v1.0.0](https://github.com/miac-research/MARS-WMH/pkgs/container/wmh-nnunet/391770322?tag=1.0.0) | supported |
+
+*While not officially supported, our testing indicates that the MD-GRU image can run on Blackwell. However, the brainmask will be generated using the CPU, which is much slower and may produce slightly different results compared to an all-GPU pipeline.
 
 ### nnU-Net algorithm using Apptainer
 
@@ -93,7 +100,7 @@ If you do not want to use the pre-built images, you can build them yourself loca
 2. In this folder, run `docker build -t mars-wmh-{mdgru/nnunet} .`
 
 > [!NOTE]
-> During building, multiple external sources need to be used, e.g., base images are downloaded from the NVIDIA NGC registry, scripts are download from this Github repository, and larger model files are downloaded from Zenodo. Make sure you can access all required external sources in your build environment.
+> During building, multiple external sources need to be used, e.g., base images are downloaded from the NVIDIA NGC registry, scripts are downloades from this Github repository, and larger model files from Zenodo. Make sure you can access all required external sources in your build environment.
 
 ## Licenses of redistributed software
 
