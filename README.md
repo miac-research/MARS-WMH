@@ -20,6 +20,9 @@ Ready-to-use, pre-built images are available for download from the [Github conta
 
 In general, we recommend the nnU-Net algorithm (please see our publication for a detailed comparison between the two algorithms) and using Apptainer (the standard container tool for scientific computing).
 
+> [!NOTE] 
+> Segmentation results from various container versions may differ slightly. Please avoid mixing versions in your project. Additionally, using different compute hardware (CPU versus GPU or varying GPU architectures) may lead to minor variations in the segmentation results.
+
 ### Data requirements
 
 The WMH segmentation requires two inputs, a **FLAIR image and a T1-weighted image**, both in NIfTI-1 data format. We recommend [dcm2niix](https://github.com/rordenlab/dcm2niix) for DICOM to NIfTI conversion. Ensure that the entire brain is covered by the field of view. By default, the T1-weighted image will be registered to the FLAIR. However, already registered images can be provided as well (see option `-skipRegistration`).  
