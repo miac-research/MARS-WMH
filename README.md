@@ -4,9 +4,9 @@ The **MIAC Automated Region Segmentation (MARS) for White Matter Hyperintensitie
 
 This repository includes ready-to-use, pre-built container images of two methods, based on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) or [MD-GRU](https://github.com/zubata88/mdgru), along with the code needed to build these images.
 
-The methods are described in detail in the following publication: 
+The methods are described in detail in the publication currently available as a pre-print:
  
-> Submitted. Please contact us if you would like to use MARS-WMH and publish your work before our method publication becomes available.
+> Gesierich et al., Technical and Clinical Validation of a Novel Deep Learning-Based White Matter Hyperintensity Segmentation Tool. Available as a pre-print at SSRN: [DOI](https://dx.doi.org/10.2139/ssrn.5330929)
 
 Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
