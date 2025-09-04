@@ -6,7 +6,7 @@ This repository includes ready-to-use, pre-built container images of two methods
 
 The methods are described in detail in the publication currently available as a pre-print:
  
-> **Gesierich et al., Technical and Clinical Validation of a Novel Deep Learning-Based White Matter Hyperintensity Segmentation Tool. Cereb Circ Cogn Behav. 2025 [DOI](https://doi.org/10.1016/j.cccb.2025.100393).**
+> **Gesierich et al. 2025. Technical and Clinical Validation of a Novel Deep Learning-Based White Matter Hyperintensity Segmentation Tool. Cereb Circ Cogn Behav. DOI: [10.1016/j.cccb.2025.100393](https://doi.org/10.1016/j.cccb.2025.100393).**
 
 Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
