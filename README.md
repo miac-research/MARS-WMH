@@ -14,6 +14,18 @@ Please ensure to cite this publication when using the methods, and please note t
 > These methods are **NOT medical devices** and **for non-commercial, academic research use only!** 
 > Do NOT use these methods for diagnosis, prognosis, monitoring or any other purposes in clinical use.
 
+## TLDR;
+
+Detailed instructions are provided below, here is the quick start version:
+
+```shell
+# 1. Pull the container image and save as Apptainer .sif file 
+apptainer build mars-wmh-nnunet.sif docker://ghcr.io/miac-research/wmh-nnunet:latest
+
+# 2. Run inference with on a FLAIR and T1w image in the current working directory using Apptainer and GPU
+apptainer run -B $(pwd) --nv mars-wmh-nnunet.sif --flair FLAIR.nii.gz --t1 T1w.nii.gz
+```
+
 ## Using the pre-built container images
 
 Ready-to-use, pre-built images are available for download from the [Github container registry](https://github.com/miac-research/MARS-WMH/packages). The images have been tested with Apptainer and Docker. 
