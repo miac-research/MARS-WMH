@@ -6,7 +6,7 @@ This repository includes ready-to-use, pre-built container images of two methods
 
 The methods are described in detail in the publication currently available as a pre-print:
  
-> **Gesierich et al. 2025. Technical and Clinical Validation of a Novel Deep Learning-Based White Matter Hyperintensity Segmentation Tool. Cereb Circ Cogn Behav. DOI: [10.1016/j.cccb.2025.100393](https://doi.org/10.1016/j.cccb.2025.100393).**
+> **Gesierich et al. (2025). Technical and Clinical Validation of a Novel Deep Learning-Based White Matter Hyperintensity Segmentation Tool. Cereb Circ Cogn Behav. DOI: [10.1016/j.cccb.2025.100393](https://doi.org/10.1016/j.cccb.2025.100393).**
 
 Please ensure to cite this publication when using the methods, and please note that the license does not cover any commercial use (defined as use for which any financial return is received). Please also cite the underlying deep learning method (nnU-Net, DOI: [10.1038/s41592-020-01008-z](https://doi.org/10.1038/s41592-020-01008-z) or MD-GRU, DOI: [10.1007/978-3-319-75238-9_3](https://doi.org/10.1007/978-3-319-75238-9_3)).
 
@@ -109,13 +109,13 @@ docker run --rm mars-wmh-mdgru:latest -h
 
 ## Building the container images yourself
 
-If you do not want to use the pre-built images, you can build them yourself locally using the provided Dockerfiles in the `mdgru` and `nnunet` folders.
+If you prefer to build the container images yourself, you can use the provided files in the `mdgru` and `nnunet` folders.
 
-1. Download the mdgru or nnunet Dockerfile and place it into a local folder.
+1. Download the corresponding files (Dockerfile and Python scripts) and place them into a folder.
 2. In this folder, run `docker build -t mars-wmh-{mdgru/nnunet} .`
 
 > [!NOTE]
-> During building, multiple external sources need to be used, e.g., base images are downloaded from the NVIDIA NGC registry, scripts are downloades from this Github repository, and larger model files from Zenodo. Make sure you can access all required external sources in your build environment.
+> During building, multiple external sources need to be used, e.g., base images are downloaded from NVIDIA NGC (which might require authentication) or Dockerhub, and larger model files from Zenodo. Make sure you can access all required external sources in your build environment.
 
 ## Licenses of redistributed software
 
@@ -128,6 +128,6 @@ Please note the license terms of software components that we redistribute within
 
 ## Funding
 
-Development and maintenance of this software is funded by the [Medical Image Analysis Center (MIAC AG)](https://miac.swiss).
+Development and maintenance of this software is funded by the Medical Image Analysis Center (MIAC AG).
 
-[![MIAC Logo](http://miac.swiss/gallery/normal/116/miaclogo@2x.png)](https://miac.swiss)
+![MIAC Logo](images/miaclogo@2x.png)

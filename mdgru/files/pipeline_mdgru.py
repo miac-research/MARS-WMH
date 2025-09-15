@@ -73,7 +73,7 @@ def qfrom_2_sform_and_compress(fname_in, fname_out=None):
         fname_out = fname_in
     if fname_out.endswith('.nii'):
         fname_remove = fname_out
-        fname_out = re.sub('\.nii$', '.nii.gz', fname_out)
+        fname_out = re.sub(r'\.nii$', '.nii.gz', fname_out)
     nib.save(nii, fname_out)
     if 'fname_remove' in locals() and os.path.exists(fname_remove):
         Path(fname_remove).unlink()
@@ -176,7 +176,7 @@ def dilate_brainmask(fn, fnNew=None):
     nib.save(nii, fnNew)
 
 def register_with_slicer(fixed, moving, fixedMask, movingMask, registered, verbose=True):
-    registered = re.sub('\.nii(\.gz)?$', '', registered) #- remove extension, which will be added below
+    registered = re.sub(r'\.nii(\.gz)?$', '', registered) #- remove extension, which will be added below
     slicer = (f'/opt/BRAINSFit/BRAINSFit --fixedVolume "{fixed}" --movingVolume "{moving}" --initializeTransformMode useCenterOfROIAlign'
     f' --outputTransform "{registered}.h5" --outputVolume "{registered}.nii.gz"' +
     f' --outputVolumePixelType float --samplingPercentage 0.1' +
@@ -270,7 +270,7 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         print('Warning: output label map exists already and will be overwritten\n')
 
     strRand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    dirTemp = re.sub('\.nii(\.gz)?$', '_temp-'+strRand, wmh_mask)
+    dirTemp = re.sub(r'\.nii(\.gz)?$', '_temp-'+strRand, wmh_mask)
     if verbose: print(f"Creating temporary folder for processing:\n"
                       f"  {dirTemp}")
     if os.path.exists(dirTemp):
@@ -340,8 +340,8 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
 
 
     # Create brain mask for FLAIR
-    flair_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', flair)
-    flair_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', flair)
+    flair_brain = re.sub(r'\.nii(\.gz)?$', '_brain.nii.gz', flair)
+    flair_bmask = re.sub(r'\.nii(\.gz)?$', '_brain_mask.nii.gz', flair)
     start = time.time()
     hdbet(flair, flair_brain, verbose)
     end = time.time()
@@ -351,30 +351,30 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         t1_rFlair = t1
     else:
         # Create brain mask for T1w
-        t1_brain = re.sub('\.nii(\.gz)?$', '_brain.nii.gz', t1)
-        t1_bmask = re.sub('\.nii(\.gz)?$', '_brain_mask.nii.gz', t1)
+        t1_brain = re.sub(r'\.nii(\.gz)?$', '_brain.nii.gz', t1)
+        t1_bmask = re.sub(r'\.nii(\.gz)?$', '_brain_mask.nii.gz', t1)
         start = time.time()
         hdbet(t1, t1_brain, verbose)
         end = time.time()
         if verbose: print(f"Duration HDBET: {end - start}\n")
         
         # Dilate brain masks
-        flair_bmask_dil = re.sub('\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', flair_bmask)
+        flair_bmask_dil = re.sub(r'\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', flair_bmask)
         dilate_brainmask(flair_bmask, flair_bmask_dil)
-        t1_bmask_dil = re.sub('\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', t1_bmask)
+        t1_bmask_dil = re.sub(r'\.nii(\.gz)?$', '_dilated-c3-i2.nii.gz', t1_bmask)
         dilate_brainmask(t1_bmask, t1_bmask_dil)
 
         # Run registration
         start = time.time()
-        t1_rFlair = re.sub('\.nii(\.gz)?$', '_rFLAIR.nii.gz', t1)
+        t1_rFlair = re.sub(r'\.nii(\.gz)?$', '_rFLAIR.nii.gz', t1)
         register_with_slicer(flair, t1, flair_bmask_dil, t1_bmask_dil, t1_rFlair, verbose)
         end = time.time()
         if verbose: print(f"Duration registration: {end - start}\n")
 
     
     if verbose: print('Applying brain mask to FLAIR and T1w')
-    flair_noBet = re.sub('\.nii(\.gz)?$', '_noBet.nii.gz', flair)
-    t1_rFlair_noBet = re.sub('\.nii(\.gz)?$', '_noBet.nii.gz', t1_rFlair)
+    flair_noBet = re.sub(r'\.nii(\.gz)?$', '_noBet.nii.gz', flair)
+    t1_rFlair_noBet = re.sub(r'\.nii(\.gz)?$', '_noBet.nii.gz', t1_rFlair)
     copy2(flair, flair_noBet)
     copy2(t1_rFlair, t1_rFlair_noBet)
     apply_mask(flair, flair_bmask)
@@ -404,9 +404,9 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
     else:
         # flip images
         if verbose: print('Flipping images left/richt and running MD-GRU again:')
-        flair_flipped = re.sub('\.nii(\.gz)?$', '_flipped.nii.gz', flair)
+        flair_flipped = re.sub(r'\.nii(\.gz)?$', '_flipped.nii.gz', flair)
         flip_axes(flair, flair_flipped, axis=0)
-        t1_rFlair_flipped = re.sub('\.nii(\.gz)?$', '_flipped.nii.gz', t1_rFlair)
+        t1_rFlair_flipped = re.sub(r'\.nii(\.gz)?$', '_flipped.nii.gz', t1_rFlair)
         flip_axes(t1_rFlair, t1_rFlair_flipped, axis=0)
         if verbose: print('')
         # Predict WMH for flipped images
@@ -438,7 +438,7 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         arr = np.mean( np.stack((arr1,arr2)) , axis=0 )
         res = sitk.GetImageFromArray(arr)
         res.CopyInformation(img1)
-        probdist_avg = re.sub('\.nii(\.gz)?$', '_averaged.nii.gz', probdist)
+        probdist_avg = re.sub(r'\.nii(\.gz)?$', '_averaged.nii.gz', probdist)
         sitk.WriteImage(res, probdist_avg)
         
         # Threshold the averaged probability map, to get a new labelmap (although this is not always used later)
@@ -446,7 +446,7 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
         arr = (arr >= 0.5) * 1
         res = sitk.GetImageFromArray(arr)
         res.CopyInformation(img1)
-        labelmap_avg = re.sub('\.nii(\.gz)?$', '_averaged.nii.gz', labelmap)
+        labelmap_avg = re.sub(r'\.nii(\.gz)?$', '_averaged.nii.gz', labelmap)
         sitk.WriteImage(res, labelmap_avg)
 
     apply_mask(labelmap_avg, flair_bmask)
@@ -497,12 +497,12 @@ def pipeline_mdgru(flair, t1, wmh_mask, skipRegistration=False, flip=False, save
     df = extract_statistics(wmh_mask)
     if verbose: print(f'\nStatistics for WMH lesions in output mask:\n ', df)
     if saveStatistics:
-        wmh_stats = re.sub('\.nii(\.gz)?$', '.csv', wmh_mask)
+        wmh_stats = re.sub(r'\.nii(\.gz)?$', '.csv', wmh_mask)
         df.to_csv(wmh_stats, index=False)
 
     # Create QC
     if not args.omitQC:
-        fnHTML = re.sub('\.nii(\.gz)?$', '', wmh_mask) + '_QC.html'
+        fnHTML = re.sub(r'\.nii(\.gz)?$', '', wmh_mask) + '_QC.html'
         if verbose: print(f'\nSaving QC image to:\n ', fnHTML)
         fnPNG = create_qc_image([flair_noBet, t1_rFlair_noBet], labelmap_avg, flair_bmask)
         text=None
@@ -534,8 +534,8 @@ def isNIfTI(s):
         raise argparse.ArgumentTypeError("File path does not exist or is not NIfTI. Please check: %s"%(s))
     
 def isSuffix(s):
-    if len(re.sub('\.nii(\.gz)?$', '', s)) > 0:
-        return re.sub('\.nii(\.gz)?$', '', s)
+    if len(re.sub(r'\.nii(\.gz)?$', '', s)) > 0:
+        return re.sub(r'\.nii(\.gz)?$', '', s)
     else:
         raise argparse.ArgumentTypeError("String is not suited as suffix. Please check: %s"%(s))
 
@@ -590,7 +590,7 @@ if __name__ == "__main__":
     if args.fnOut:
         assert args.fnOut.endswith('.nii.gz'), f'Provided output file extension has to be ".nii.gz". Please check: {args.fnOut}'
     else:
-        args.fnOut = re.sub('\.nii(\.gz)?$', '', args.fnFLAIR) + args.suffix + '.nii.gz'
+        args.fnOut = re.sub(r'\.nii(\.gz)?$', '', args.fnFLAIR) + args.suffix + '.nii.gz'
     if args.dirOut:
         args.fnOut = join(args.dirOut, basename(args.fnOut))
 

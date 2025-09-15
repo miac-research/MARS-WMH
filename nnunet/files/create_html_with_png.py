@@ -8,7 +8,7 @@ def create_html_with_png(fnPNG, fnHTML, df=None, text=None, aspect_ratio='auto')
 
   # Read CSV file, if df is not provided
   if df is None:
-    fnCSV = re.sub('_QC\.html$', '.csv', fnHTML)
+    fnCSV = re.sub(r'_QC\.html$', '.csv', fnHTML)
     if os.path.exists(fnCSV):
         df = pd.read_csv(fnCSV)
     else:

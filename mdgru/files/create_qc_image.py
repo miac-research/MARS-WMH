@@ -123,7 +123,7 @@ def create_qc_image(fnamesBG, fnameWMH, fnameBmask=None):
     if fnameBmask is not None:
         ax.contour(images[3], levels=[0.5], colors='cyan', linestyles='solid', linewidths=2, alpha=1, antialiased = True)
     # Save
-    fnames[0] = re.sub('\.nii(\.gz)?$', '.png', fnames[0])
+    fnames[0] = re.sub(r'\.nii(\.gz)?$', '.png', fnames[0])
     plt.savefig(fnames[0], transparent=False, bbox_inches='tight', pad_inches=0)
 
     # Visualize T1w
@@ -148,13 +148,13 @@ def create_qc_image(fnamesBG, fnameWMH, fnameBmask=None):
     if fnameBmask is not None:
         ax.contour(images[3], levels=[0.5], colors='cyan', linestyles='solid', linewidths=2, alpha=1, antialiased = True)
     # Save
-    fnames[1] = re.sub('\.nii(\.gz)?$', '.png', fnames[1])
+    fnames[1] = re.sub(r'\.nii(\.gz)?$', '.png', fnames[1])
     plt.savefig(fnames[1], transparent=True, bbox_inches='tight', pad_inches=0)
 
 
     # Create an animated PNG using imageio
     frames = [iio.imread(fn) for fn in fnames[0:2]]
-    fnPNG = re.sub('\.nii(\.gz)?$', '_QC.png', fnameWMH)
+    fnPNG = re.sub(r'\.nii(\.gz)?$', '_QC.png', fnameWMH)
     iio.imwrite(fnPNG, frames, format="PNG", duration=1000)
 
     return fnPNG
